@@ -1,4 +1,10 @@
-name: Deploy to GitHub Pages
+name: Deploy preview to gh-pages branch
+
+# Builds the Vite app on every push and force-pushes the dist/ output to a
+# `gh-pages` branch. After the first successful run, enable serving from
+# that branch under Settings -> Pages -> Source: "Deploy from a branch" ->
+# Branch: gh-pages -> /(root). The site will then be live at
+# https://<user>.github.io/Pokedely/.
 
 on:
   push:
@@ -6,40 +12,26 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: pages-deploy
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
       - run: npm install --no-audit --no-fund
       - run: npm run build
-      - uses: actions/configure-pages@v5
+      - name: Deploy to gh-pages branch
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          # Auto-create the Pages site on first run so no manual setup is
-          # required. Falls back silently if Pages is already enabled.
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          branch: gh-pages
+          folder: dist
+          clean: true
+          single-commit: true
