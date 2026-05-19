@@ -5,10 +5,11 @@ Pokémon means solving a quick STEM question. Designed for elementary-school
 players to practice **math, science, computer science, and earth-science
 history** while collecting the first 150 Kanto Pokémon.
 
-> Built slice by slice. **Slice 2 (current)** is tuned for a 6-year-old:
-> spelling, reading, counting, shape and color questions, scattered Poké
-> Ball and Berry pickups, a walkable Poké Center interior, and a bigger
-> map with a beach, a mountain notch, and a flower meadow to explore.
+> Built slice by slice. **Slice 3 (current)** swaps the hand-coded question
+> set for a Claude-authored JSON bank (150+ unique questions across 14
+> subjects), uses real PokéAPI item sprites for Poké Balls and Berries,
+> adds layered tree art with drop shadows, multi-variant grass tiles, and
+> ambient wandering Pokémon you can sneak up on to bias the next encounter.
 
 ## Quickstart
 
@@ -33,6 +34,34 @@ of catching jump way up. Three wrong answers and the Pokémon runs off.
 
 Your progress (team, Pokédex, STEM accuracy) is saved to `localStorage`,
 so closing the tab won't lose progress.
+
+## What's new in Slice 3
+
+- **Claude-authored question bank** — `src/data/questions-generated.json`
+  holds 150+ unique kid-friendly questions across 14 subjects: spelling,
+  counting, math, subtraction, alphabet, shapes, colors, animals,
+  patterns, science, reading, rhymes, opposites, categorize. Each
+  question maps to one or more Pokémon types — Grass/Bug/Water Pokémon
+  ask Nature questions, Fire/Electric/Ice ask Science, Psychic/Ghost ask
+  Patterns and Reading, etc.
+- **Regenerate with your own key** — `scripts/generate-questions.mjs`
+  calls Claude Opus 4.7 (adaptive thinking, effort=high, prompt-cached
+  system instructions) to author a fresh JSON bank. Run it any time:
+  ```bash
+  ANTHROPIC_API_KEY=sk-... node scripts/generate-questions.mjs
+  ```
+- **Real PokéAPI item sprites** — Poké Balls, Berries (Oran), and other
+  items now use the official `PokeAPI/sprites/items` PNGs instead of
+  procedural circles. Procedural fallbacks remain if the CDN fails.
+- **Ambient wandering Pokémon** — 7 wild Pokémon (Pidgey, Rattata,
+  Caterpie, Pikachu, Magikarp, Weedle, Clefairy) drift on top of the
+  world map. Walking near one biases the next tall-grass encounter
+  toward that species — give a 6-year-old a way to *hunt* for a specific
+  Pokémon instead of pure luck.
+- **Map polish** — multi-variant grass tiles (4 patterns), layered tree
+  art with drop shadows, brighter BDSP-style water with sparkles,
+  three-color flower variants, and a soft drop shadow under the
+  Poké Center building.
 
 ## What's new in Slice 2
 
@@ -81,7 +110,7 @@ so closing the tab won't lose progress.
 
 ## Roadmap — the rest of the slices
 
-- **Slice 3 — Battle first, then catch.** Wild Pokémon gets a small HP
+- **Slice 4 — Battle first, then catch.** Wild Pokémon gets a small HP
   bar; player chooses Attack (question → damage) or Throw Ball each turn.
   Adds the canonical Pokémon "weaken then catch" rhythm.
 - **Slice 4 — Build & craft.** Hotbar + inventory. Chop trees for wood,

@@ -1,7 +1,20 @@
 import Phaser from 'phaser';
 import { TILE, TILE_SIZE, generateMap, isSolid, isTallGrass } from '../game/world.js';
-import { pickRandom } from '../data/pokedex.js';
+import { pickRandom, byId, spriteUrl } from '../data/pokedex.js';
 import { load, save, recordEncounter, takeItem } from '../game/save.js';
+
+// Decorative wild Pokemon that wander on top of the world for atmosphere.
+// They aren't catchable directly — they bias the next tall-grass encounter
+// toward themselves when the player is nearby.
+const AMBIENT_MONS = [
+  { x: 20, y: 10, id: 16  },  // Pidgey near the upper-left grass
+  { x: 44, y: 14, id: 19  },  // Rattata up by the mountain
+  { x: 12, y: 30, id: 10  },  // Caterpie in the flower meadow
+  { x: 30, y: 23, id: 25  },  // Pikachu near the path
+  { x: 50, y: 38, id: 129 },  // Magikarp by the beach
+  { x: 36, y: 30, id: 13  },  // Weedle southeast
+  { x: 8,  y: 18, id: 35  }   // Clefairy near the lake
+];
 
 // The overworld. Player walks on a grid using arrow keys / WASD. Stepping on
 // tall grass tiles rolls for a wild encounter. Walking over item sprites
@@ -14,6 +27,17 @@ export default class WorldScene extends Phaser.Scene {
     this.state = load();
     this.encounterCooldown = 0;
     this.lastTile = null;
+    this.ambientSprites = [];
+    this.biasedMon = null;
+  }
+
+  preload() {
+    // Preload ambient Pokemon sprites so they appear immediately when the
+    // world is drawn.
+    for (const m of AMBIENT_MONS) {
+      const key = `mon-${m.id}`;
+      if (!this.textures.exists(key)) this.load.image(key, spriteUrl(m.id));
+    }
   }
 
   create() {
@@ -21,21 +45,27 @@ export default class WorldScene extends Phaser.Scene {
     this.mapData = map; this.mapW = width; this.mapH = height;
     this.features = features;
 
-    // Tile sprites. Always paint grass under everything so there are no gaps.
+    // Tile sprites. Always paint a (varied) grass base under everything so
+    // there are no gaps. Pick a deterministic variant by hashing the coord.
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        this.add.image(x * TILE_SIZE, y * TILE_SIZE, 'tile-grass').setOrigin(0).setDepth(0);
+        const variant = (x * 7 + y * 13) % 4;
+        const grassKey = variant === 0 ? 'tile-grass' : `tile-grass-${variant}`;
+        this.add.image(x * TILE_SIZE, y * TILE_SIZE, grassKey).setOrigin(0).setDepth(0);
         const code = map[y][x];
         if (code === TILE.GRASS) continue;
-        const key = textureFor(code);
+        const key = textureFor(code, x, y);
         if (!key) continue;
         const img = this.add.image(x * TILE_SIZE, y * TILE_SIZE, key).setOrigin(0);
         img.setDepth(code === TILE.TREE ? 5 : 1);
       }
     }
 
-    // Poke Center building.
+    // Poke Center building with a soft drop shadow.
     const pc = features.pokeCenter;
+    this.add.ellipse(
+      pc.x * TILE_SIZE + 32, pc.y * TILE_SIZE + 44, 110, 18, 0x000000, 0.25
+    ).setDepth(5);
     this.add.image(pc.x * TILE_SIZE - 16, pc.y * TILE_SIZE - 40, 'pokecenter').setOrigin(0).setDepth(6);
     // A glowing door marker so the kid sees where to walk.
     const door = features.door;
@@ -63,20 +93,35 @@ export default class WorldScene extends Phaser.Scene {
       ).setOrigin(0.5, 1).setDepth(7);
     }
 
-    // Items on the map.
+    // Items on the map — prefer real PokéAPI sprites, fall back to procedural.
     this.itemSprites = new Map();
     for (const it of features.items) {
       const key = `${it.x},${it.y}`;
       if (this.state.worldItems[key]) continue;
-      const tex = it.type === 'pokeball' ? 'pokeball' : 'berry';
+      const tex = textureForItem(it.type, this.textures);
       const sprite = this.add.image(
         it.x * TILE_SIZE + TILE_SIZE / 2,
         it.y * TILE_SIZE + TILE_SIZE / 2,
         tex
-      ).setDepth(4).setScale(1.1);
-      // Subtle bob.
-      this.tweens.add({ targets: sprite, y: sprite.y - 3, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.InOut' });
-      this.itemSprites.set(key, { sprite, item: it });
+      ).setDepth(4).setScale(it.type === 'pokeball' ? 1.4 : 1.3);
+      // Soft drop shadow under the item.
+      const shadow = this.add.ellipse(sprite.x, sprite.y + 10, 18, 5, 0x000000, 0.3).setDepth(3);
+      this.tweens.add({ targets: sprite, y: sprite.y - 4, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.InOut' });
+      this.itemSprites.set(key, { sprite, shadow, item: it });
+    }
+
+    // Ambient wandering Pokemon — decorative.
+    for (const m of AMBIENT_MONS) {
+      const sprKey = `mon-${m.id}`;
+      if (!this.textures.exists(sprKey)) continue;
+      const px = m.x * TILE_SIZE + TILE_SIZE / 2;
+      const py = m.y * TILE_SIZE + TILE_SIZE / 2;
+      const shadow = this.add.ellipse(px, py + 10, 24, 6, 0x000000, 0.3).setDepth(3);
+      const sprite = this.add.image(px, py, sprKey).setDepth(4).setScale(1.6);
+      this.tweens.add({
+        targets: sprite, y: sprite.y - 6, yoyo: true, repeat: -1, duration: 900 + Math.random() * 400, ease: 'Sine.InOut'
+      });
+      this.ambientSprites.push({ sprite, shadow, mon: m });
     }
 
     // Player.
@@ -169,6 +214,7 @@ export default class WorldScene extends Phaser.Scene {
     this.resolveCollisions();
     this.checkItemPickup();
     this.checkDoor();
+    this.updateAmbientBias();
 
     // Encounter check on tall grass, throttled per-tile entry.
     this.encounterCooldown = Math.max(0, this.encounterCooldown - delta);
@@ -220,16 +266,18 @@ export default class WorldScene extends Phaser.Scene {
   checkItemPickup() {
     if (this.itemSprites.size === 0) return;
     const px = this.player.x, py = this.player.y + 10;
-    for (const [key, { sprite, item }] of this.itemSprites) {
+    for (const [key, { sprite, shadow, item }] of this.itemSprites) {
       if (Phaser.Math.Distance.Between(px, py, sprite.x, sprite.y) > 24) continue;
-      // Pick it up.
       takeItem(this.state, item.x, item.y, item.type);
       this.tweens.add({
-        targets: sprite, y: sprite.y - 22, alpha: 0, scale: 1.5, duration: 400,
+        targets: sprite, y: sprite.y - 22, alpha: 0, scale: 1.8, duration: 400,
         onComplete: () => sprite.destroy()
       });
+      if (shadow) {
+        this.tweens.add({ targets: shadow, alpha: 0, duration: 300, onComplete: () => shadow.destroy() });
+      }
       this.itemSprites.delete(key);
-      const label = item.type === 'pokeball' ? '🔴 Poké Ball' : '🍓 Berry';
+      const label = item.type === 'pokeball' ? 'Poké Ball' : 'Berry';
       this.toast(`Found a ${label}!`);
     }
   }
@@ -245,9 +293,27 @@ export default class WorldScene extends Phaser.Scene {
     }
   }
 
+  updateAmbientBias() {
+    // If the player is near an ambient Pokemon, bias the next encounter
+    // toward it. This gives the kid a way to "hunt" for a specific Pokemon
+    // by walking up to it on the map.
+    this.biasedMon = null;
+    const px = this.player.x, py = this.player.y;
+    let closest = null, closestDist = 96;
+    for (const a of this.ambientSprites) {
+      const d = Phaser.Math.Distance.Between(px, py, a.sprite.x, a.sprite.y);
+      if (d < closestDist) { closestDist = d; closest = a; }
+    }
+    if (closest) this.biasedMon = closest.mon.id;
+  }
+
   triggerEncounter() {
     this.encounterCooldown = 1500;
-    const wild = pickRandom();
+    // 70% chance to use the biased ambient mon when one is nearby; otherwise
+    // a random weighted pick from the whole Kanto bank.
+    const wild = (this.biasedMon && Math.random() < 0.7)
+      ? (byId(this.biasedMon) || pickRandom())
+      : pickRandom();
     recordEncounter(this.state, wild);
 
     this.cameras.main.flash(220, 255, 255, 255);
@@ -259,15 +325,28 @@ export default class WorldScene extends Phaser.Scene {
   }
 }
 
-function textureFor(code) {
+function textureFor(code, x, y) {
   switch (code) {
     case TILE.TALLGRASS: return 'tile-tallgrass';
     case TILE.TREE:      return 'tile-tree';
     case TILE.WATER:     return 'tile-water';
     case TILE.PATH:      return 'tile-path';
     case TILE.SAND:      return 'tile-sand';
-    case TILE.FLOWER:    return 'tile-flower';
+    case TILE.FLOWER: {
+      const v = (x + y * 3) % 3;
+      return v === 0 ? 'tile-flower' : `tile-flower-${v}`;
+    }
     case TILE.ROCK:      return 'tile-rock';
     default: return null;
   }
+}
+
+function textureForItem(type, textures) {
+  if (type === 'pokeball') {
+    return textures.exists('item-pokeball') ? 'item-pokeball' : 'pokeball';
+  }
+  if (type === 'berry') {
+    return textures.exists('item-oranberry') ? 'item-oranberry' : 'berry';
+  }
+  return 'pokeball';
 }
