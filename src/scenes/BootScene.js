@@ -1,48 +1,68 @@
 import Phaser from 'phaser';
 import { TILE_SIZE } from '../game/world.js';
 
-// Generate every starter texture procedurally. Slice 2 swaps these for
-// Kenney/PokeAPI tile assets while keeping the same texture keys.
+// Generate every starter texture procedurally, plus preload real PokeAPI
+// item sprites for Poke Balls and Berries (CC0 / public sprites repo).
+
+const POKEAPI_ITEMS = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items';
 
 export default class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
   preload() {
-    // Show a tiny progress bar in case Phaser needs to load anything later.
     const w = this.scale.width, h = this.scale.height;
     const bar = this.add.rectangle(w / 2, h / 2, 200, 8, 0xffd54a, 0.9).setOrigin(0.5);
     bar.scaleX = 0;
     this.load.on('progress', v => { bar.scaleX = v; });
     this.load.on('complete', () => bar.destroy());
+
+    // Real PokéAPI item icons (24x24-ish PNGs). Procedural fallbacks are
+    // generated in create() if any of these fail to load.
+    this.load.image('item-pokeball',   `${POKEAPI_ITEMS}/poke-ball.png`);
+    this.load.image('item-greatball',  `${POKEAPI_ITEMS}/great-ball.png`);
+    this.load.image('item-ultraball',  `${POKEAPI_ITEMS}/ultra-ball.png`);
+    this.load.image('item-oranberry',  `${POKEAPI_ITEMS}/oran-berry.png`);
+    this.load.image('item-pechaberry', `${POKEAPI_ITEMS}/pecha-berry.png`);
+    this.load.image('item-sitrusberry',`${POKEAPI_ITEMS}/sitrus-berry.png`);
+    this.load.image('item-potion',     `${POKEAPI_ITEMS}/potion.png`);
+    this.load.on('loaderror', e => console.warn('asset failed:', e.src));
   }
 
   create() {
     const S = TILE_SIZE;
     const g = this.make.graphics({ x: 0, y: 0, add: false });
 
-    // --- Tiles ---
-    // Grass base
-    drawGrass(g, S, 0x6bbd4c, 0x57a83c);   g.generateTexture('tile-grass', S, S); g.clear();
-    // Tall grass
+    // --- Grass variants (4 subtly different tiles for visual variety) ---
+    drawGrass(g, S, 0x6bbd4c, 0x57a83c);   g.generateTexture('tile-grass', S, S);   g.clear();
+    drawGrass(g, S, 0x70c252, 0x59ad3e);   g.generateTexture('tile-grass-1', S, S); g.clear();
+    drawGrass(g, S, 0x67b647, 0x52a138);
+    g.fillStyle(0xa3d68a, 1); g.fillRect(6, 22, 3, 3); g.fillRect(22, 8, 3, 3);
+    g.generateTexture('tile-grass-2', S, S); g.clear();
+    drawGrass(g, S, 0x6bbd4c, 0x57a83c);
+    g.fillStyle(0x4f9233, 1); g.fillTriangle(10, 28, 12, 24, 14, 28);
+    g.fillTriangle(20, 26, 22, 22, 24, 26);
+    g.generateTexture('tile-grass-3', S, S); g.clear();
+
+    // Tall grass with brighter blades.
     drawTallGrass(g, S);                    g.generateTexture('tile-tallgrass', S, S); g.clear();
-    // Tree
+    // Tree (layered canopy + drop shadow baked in).
     drawTree(g, S);                         g.generateTexture('tile-tree', S, S); g.clear();
-    // Water
+    // Water (brighter, with sparkles).
     drawWater(g, S);                        g.generateTexture('tile-water', S, S); g.clear();
-    // Path
+    // Path tiles.
     drawPath(g, S);                         g.generateTexture('tile-path', S, S); g.clear();
-    // Sand
+    // Sand.
     drawSand(g, S);                         g.generateTexture('tile-sand', S, S); g.clear();
-    // Flower
+    // Flowers — three colour variants on grass.
+    drawFlowerTile(g, S);                   g.generateTexture('tile-flower', S, S); g.clear();
+    drawFlowerTile(g, S, 0xff77aa, 0xffe14a, 0xffffff); g.generateTexture('tile-flower-1', S, S); g.clear();
+    drawFlowerTile(g, S, 0x9b6cff, 0xffe14a, 0xff77aa); g.generateTexture('tile-flower-2', S, S); g.clear();
+    // Rock.
     drawGrass(g, S, 0x6bbd4c, 0x57a83c);
-    g.fillStyle(0xffffff, 1); g.fillCircle(10, 10, 3);
-    g.fillStyle(0xff77aa, 1); g.fillCircle(22, 18, 3);
-    g.fillStyle(0xffe14a, 1); g.fillCircle(14, 24, 2);
-    g.generateTexture('tile-flower', S, S); g.clear();
-    // Rock
-    drawGrass(g, S, 0x6bbd4c, 0x57a83c);
-    g.fillStyle(0x8a8d92, 1); g.fillRoundedRect(8, 10, 16, 14, 6);
-    g.fillStyle(0xacafb4, 1); g.fillRoundedRect(11, 12, 8, 5, 3);
+    g.fillStyle(0x000000, 0.18); g.fillEllipse(S / 2, S - 6, 20, 6);
+    g.fillStyle(0x6c7079, 1); g.fillRoundedRect(8, 10, 16, 14, 6);
+    g.fillStyle(0x8e9299, 1); g.fillRoundedRect(11, 12, 8, 5, 3);
+    g.fillStyle(0xacafb4, 1); g.fillRect(13, 14, 3, 2);
     g.generateTexture('tile-rock', S, S); g.clear();
 
     // --- Player frames: 4 directions, 2 walk frames each. Size 18 x 26. ---
@@ -86,6 +106,16 @@ function drawGrass(g, S, a, b) {
   }
 }
 
+function drawFlowerTile(g, S, c1 = 0xffffff, c2 = 0xff77aa, c3 = 0xffe14a) {
+  drawGrass(g, S, 0x6bbd4c, 0x57a83c);
+  g.fillStyle(c1, 1); g.fillCircle(10, 10, 3);
+  g.fillStyle(c2, 1); g.fillCircle(22, 18, 3);
+  g.fillStyle(c3, 1); g.fillCircle(14, 24, 2);
+  // Center dots for a flower look.
+  g.fillStyle(0xffd54a, 1); g.fillCircle(10, 10, 1);
+  g.fillCircle(22, 18, 1);
+}
+
 function drawTallGrass(g, S) {
   drawGrass(g, S, 0x4ea53a, 0x3d8c2e);
   g.fillStyle(0x6cc44c, 1);
@@ -104,28 +134,49 @@ function drawTallGrass(g, S) {
 
 function drawTree(g, S) {
   drawGrass(g, S, 0x6bbd4c, 0x57a83c);
-  // trunk
+  // Drop shadow under the trunk for depth.
+  g.fillStyle(0x000000, 0.22);
+  g.fillEllipse(S / 2, S - 4, 26, 8);
+  // Trunk with a shaded side.
   g.fillStyle(0x6b4226, 1);
-  g.fillRect(S / 2 - 3, S - 12, 6, 10);
-  // canopy 3 puffs
-  g.fillStyle(0x1f6a2a, 1);
-  g.fillCircle(S / 2, S / 2 - 2, 11);
-  g.fillCircle(S / 2 - 7, S / 2 + 3, 8);
-  g.fillCircle(S / 2 + 7, S / 2 + 3, 8);
+  g.fillRect(S / 2 - 3, S - 14, 6, 12);
+  g.fillStyle(0x4a2c19, 1);
+  g.fillRect(S / 2 - 3, S - 14, 2, 12);
+  // Dark canopy base — three round puffs.
+  g.fillStyle(0x174d20, 1);
+  g.fillCircle(S / 2, S / 2 - 2, 12);
+  g.fillCircle(S / 2 - 8, S / 2 + 3, 9);
+  g.fillCircle(S / 2 + 8, S / 2 + 3, 9);
+  // Mid-green highlight layer.
   g.fillStyle(0x2e8a3a, 1);
-  g.fillCircle(S / 2 - 2, S / 2 - 4, 5);
-  g.fillCircle(S / 2 + 3, S / 2 - 2, 4);
+  g.fillCircle(S / 2 - 2, S / 2 - 4, 7);
+  g.fillCircle(S / 2 + 5, S / 2 - 1, 6);
+  g.fillCircle(S / 2 - 6, S / 2 + 1, 5);
+  // Bright sun-side highlights.
+  g.fillStyle(0x6dc25b, 0.85);
+  g.fillCircle(S / 2 - 4, S / 2 - 7, 3);
+  g.fillCircle(S / 2 + 3, S / 2 - 5, 2);
+  g.fillStyle(0x95dd7a, 0.7);
+  g.fillCircle(S / 2 - 5, S / 2 - 6, 1.5);
 }
 
 function drawWater(g, S) {
-  g.fillStyle(0x3a8fd1, 1); g.fillRect(0, 0, S, S);
-  g.fillStyle(0x5aaee8, 1);
-  for (let i = 0; i < 4; i++) {
-    const y = 5 + i * 7;
-    g.fillRect(2, y, S - 4, 1);
-  }
-  g.fillStyle(0xc4e6ff, 0.7);
-  g.fillRect(6, 6, 3, 1); g.fillRect(20, 18, 3, 1);
+  // Brighter, BDSP-style ocean blue with soft horizontal ripples + sparkles.
+  g.fillStyle(0x4aa3d9, 1); g.fillRect(0, 0, S, S);
+  g.fillStyle(0x6fc1ec, 1);
+  g.fillRect(0, 5,  S, 2);
+  g.fillRect(0, 14, S, 2);
+  g.fillRect(0, 22, S, 2);
+  g.fillStyle(0x8ed5f4, 0.85);
+  g.fillRect(0, 10, S, 1);
+  g.fillRect(0, 19, S, 1);
+  g.fillStyle(0xffffff, 0.85);
+  g.fillRect(6, 5, 3, 1);
+  g.fillRect(20, 15, 3, 1);
+  g.fillRect(10, 24, 2, 1);
+  g.fillStyle(0xc4e6ff, 0.6);
+  g.fillRect(18, 8, 2, 1);
+  g.fillRect(4, 20, 2, 1);
 }
 
 function drawPath(g, S) {
