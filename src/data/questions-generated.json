@@ -181,6 +181,26 @@
       { "subject": "Sorting", "prompt": "Which one does NOT belong?\n\n🍎  🍌  🍇  🐱", "choices": ["🐱 Cat", "🍎 Apple", "🍌 Banana", "🍇 Grapes"], "answerIndex": 0, "hint": "Three are fruits, one is not." },
       { "subject": "Sorting", "prompt": "Which one does NOT belong?\n\n🐶  🐱  🐮  🚗", "choices": ["🚗 Car", "🐶 Dog", "🐱 Cat", "🐮 Cow"], "answerIndex": 0, "hint": "Three are animals, one is not." },
       { "subject": "Sorting", "prompt": "Which one lives in the OCEAN?", "choices": ["🐠 Fish", "🐱 Cat", "🐦 Bird", "🐰 Rabbit"], "answerIndex": 0, "hint": "Swims in salty water." }
+    ],
+    "addie": [
+      { "subject": "Addie's Day", "prompt": "Addie has 2 🍎 and finds 1 more.\nHow many apples does Addie have?", "choices": ["3", "2", "4", "1"], "answerIndex": 0, "hint": "Two plus one more." },
+      { "subject": "Addie's Day", "prompt": "Addie picks 4 🌸 and gives 1 to mom.\nHow many flowers are left?", "choices": ["3", "4", "2", "5"], "answerIndex": 0, "hint": "Take one away from four." },
+      { "subject": "Addie's Pets", "prompt": "Addie's kitten 🐱 says…", "choices": ["MEOW", "WOOF", "MOO", "QUACK"], "answerIndex": 0, "hint": "A soft cat sound." },
+      { "subject": "Addie's Pets", "prompt": "A baby dog is called a…", "choices": ["Puppy", "Kitten", "Calf", "Chick"], "answerIndex": 0, "hint": "Addie loves them — small and fluffy." },
+      { "subject": "Addie Spells", "prompt": "How do you spell Addie's name?", "choices": ["ADDIE", "ADIE", "ADDY", "ADIEE"], "answerIndex": 0, "hint": "Two D's in the middle." },
+      { "subject": "Addie Spells", "prompt": "Which letter does Addie's name START with?", "choices": ["A", "B", "E", "D"], "answerIndex": 0, "hint": "It's the first letter of the alphabet." },
+      { "subject": "Addie Spells", "prompt": "Which letter does Addie's name END with?", "choices": ["E", "I", "Y", "D"], "answerIndex": 0, "hint": "Say AD-DI-E out loud." },
+      { "subject": "Addie Counts", "prompt": "Addie sees ⭐⭐⭐⭐ in the sky.\nHow many stars?", "choices": ["4", "3", "5", "6"], "answerIndex": 0, "hint": "Count each star." },
+      { "subject": "Addie Counts", "prompt": "Addie has 5 fingers on one hand.\nHow many on TWO hands?", "choices": ["10", "5", "6", "8"], "answerIndex": 0, "hint": "Five plus five." },
+      { "subject": "Addie's Lunch", "prompt": "Addie's favorite fruit 🍓 is called a…", "choices": ["Strawberry", "Blueberry", "Banana", "Apple"], "answerIndex": 0, "hint": "Red with tiny seeds on the outside." },
+      { "subject": "Addie's Lunch", "prompt": "Addie eats half of 🍎🍎.\nHow many apples did Addie eat?", "choices": ["1", "2", "0", "3"], "answerIndex": 0, "hint": "Half of two." },
+      { "subject": "Addie's Colors", "prompt": "Addie's favorite color is the same as 🌸.\nWhat color is that?", "choices": ["Pink", "Blue", "Green", "Black"], "answerIndex": 0, "hint": "Like a cherry blossom." },
+      { "subject": "Addie's Colors", "prompt": "What color is Addie's rain ☂️ on a sunny day?", "choices": ["Yellow", "Black", "Purple", "Gray"], "answerIndex": 0, "hint": "Bright like the sun." },
+      { "subject": "Addie's Story", "prompt": "Addie planted a 🌱.\nWhat will it grow into?", "choices": ["A plant", "A rock", "A fish", "A cloud"], "answerIndex": 0, "hint": "Seeds grow up tall and green." },
+      { "subject": "Addie's Story", "prompt": "Addie sees 🌙 in the sky.\nIs it day or night?", "choices": ["Night", "Day", "Morning", "Noon"], "answerIndex": 0, "hint": "The moon comes out when it's dark." },
+      { "subject": "Addie's Buddies", "prompt": "Addie's favorite Pokémon is yellow and zaps.\nWho is it?", "choices": ["⚡ Pikachu", "🐢 Squirtle", "🌿 Bulbasaur", "🔥 Charmander"], "answerIndex": 0, "hint": "Electric mouse Pokémon." },
+      { "subject": "Addie's Patterns", "prompt": "Addie sees: 🍓 🍒 🍓 🍒 🍓 ___\nWhat comes next?", "choices": ["🍒", "🍓", "🍎", "🍌"], "answerIndex": 0, "hint": "It goes back and forth." },
+      { "subject": "Addie's Patterns", "prompt": "Addie counts: 2, 4, 6, ___\nWhat comes next?", "choices": ["8", "7", "5", "10"], "answerIndex": 0, "hint": "Add two more each time." }
     ]
   }
 }
