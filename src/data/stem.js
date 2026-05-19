@@ -23,12 +23,14 @@ function shuffleChoices(q) {
 }
 
 // Pokemon type → preferred category. Rare Pokemon mix in a harder category.
+// Friendly / kid-favorite types lean into the personalized "addie" bucket so
+// Addie hears her own name during the cuter encounters.
 const TYPE_TO_CATEGORY = {
-  grass: ['animals', 'science', 'spelling'],
+  grass: ['animals', 'science', 'spelling', 'addie'],
   bug:   ['animals', 'spelling', 'counting'],
   water: ['animals', 'science', 'categorize'],
   fire:  ['colors',  'science', 'opposites'],
-  electric: ['science', 'patterns', 'math'],
+  electric: ['science', 'patterns', 'math', 'addie'],
   ice:    ['science', 'opposites', 'colors'],
   steel:  ['shapes',  'patterns', 'math'],
   rock:   ['shapes',  'science', 'categorize'],
@@ -39,8 +41,8 @@ const TYPE_TO_CATEGORY = {
   psychic: ['patterns', 'alphabet', 'reading'],
   ghost:  ['rhymes',   'alphabet',   'patterns'],
   dragon: ['math',     'subtraction','reading'],
-  fairy:  ['rhymes',   'spelling',   'colors'],
-  normal: ['spelling', 'counting',   'animals'],
+  fairy:  ['rhymes',   'spelling',   'colors', 'addie'],
+  normal: ['spelling', 'counting',   'animals', 'addie'],
   dark:   ['opposites','rhymes',     'alphabet']
 };
 

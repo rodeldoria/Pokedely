@@ -170,13 +170,13 @@ export default class WorldScene extends Phaser.Scene {
       const door = this.features.door;
       this.player.setPosition((door.x + 0.5) * TILE_SIZE, (door.y + 2.2) * TILE_SIZE);
       this.facing = 'down';
-      this.toast('Healed! +3 Poké Balls, +1 Berry');
+      this.toast('All healed up, Addie! +3 Poké Balls, +1 Berry');
     });
 
-    // Toast text used for pickup feedback.
+    // Toast text used for pickup feedback. Warm Animal-Crossing chip styling.
     this.toastText = this.add.text(this.scale.width / 2, this.scale.height - 70, '', {
-      fontSize: '16px', color: '#111418', backgroundColor: '#ffd54a',
-      padding: { x: 10, y: 6 }, fontStyle: 'bold'
+      fontSize: '16px', color: '#4a2e10', backgroundColor: '#ffe082',
+      padding: { x: 14, y: 8 }, fontStyle: 'bold'
     }).setOrigin(0.5).setScrollFactor(0).setDepth(100).setAlpha(0);
   }
 

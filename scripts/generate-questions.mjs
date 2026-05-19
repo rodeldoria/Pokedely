@@ -41,7 +41,8 @@ const CATEGORIES = [
   { key: 'reading',     description: 'A one-sentence story followed by a direct comprehension question. Keep words at a kindergarten / 1st-grade level.' },
   { key: 'rhymes',      description: 'Which word rhymes with X? Use simple CVC words.' },
   { key: 'opposites',   description: 'Opposites: hot/cold, big/small, up/down, day/night, fast/slow, happy/sad, open/closed, wet/dry, light/dark, full/empty.' },
-  { key: 'categorize',  description: 'Which one is a fruit / animal / vehicle / flower / food? Or "which does not belong" with three same-category items and one outsider.' }
+  { key: 'categorize',  description: 'Which one is a fruit / animal / vehicle / flower / food? Or "which does not belong" with three same-category items and one outsider.' },
+  { key: 'addie',       description: 'Personalized questions for the player named ADDIE. Use her name in every prompt. Mix simple addition/subtraction with picture clues, spelling her own name (A-D-D-I-E, two D\'s in the middle), counting things Addie sees, identifying her favorite colors (pink, yellow) and favorite Pokémon (Pikachu, Eevee), and tiny one-sentence stories about Addie\'s day. Keep it warm and friendly — Animal-Crossing tone.' }
 ];
 
 const SYSTEM = `You are writing multiple-choice questions for a Pokémon-themed educational game played by a 6-year-old. The child is learning to read, count, recognize shapes/colors, and do simple math.

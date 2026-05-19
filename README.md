@@ -5,11 +5,13 @@ Pokémon means solving a quick STEM question. Designed for elementary-school
 players to practice **math, science, computer science, and earth-science
 history** while collecting the first 150 Kanto Pokémon.
 
-> Built slice by slice. **Slice 3 (current)** swaps the hand-coded question
-> set for a Claude-authored JSON bank (150+ unique questions across 14
-> subjects), uses real PokéAPI item sprites for Poké Balls and Berries,
-> adds layered tree art with drop shadows, multi-variant grass tiles, and
-> ambient wandering Pokémon you can sneak up on to bias the next encounter.
+> Built slice by slice. **Slice 4 (current)** dresses the encounter UI
+> and HUD in a warm Animal-Crossing palette (cream sky, peach ground,
+> rounded pastel cards and candy-style choice buttons) and adds a new
+> personalized **`addie`** question category — 18 sight-word, counting,
+> color, and tiny-story questions that call the player by name. The
+> generator script knows about the new category, so re-running it asks
+> Claude for fresh Addie content too.
 
 ## Quickstart
 
@@ -34,6 +36,28 @@ of catching jump way up. Three wrong answers and the Pokémon runs off.
 
 Your progress (team, Pokédex, STEM accuracy) is saved to `localStorage`,
 so closing the tab won't lose progress.
+
+## What's new in Slice 4
+
+- **Animal Crossing-style encounter UI** — the dark neon battle screen
+  swaps to a warm cream sky over a peach grass mound. Banners, question
+  cards, and the inventory chip are now rounded, candy-stamped panels
+  with a darker outline; the four answer buttons cycle through mint /
+  sky-blue / peach / lilac pastels with a glossy highlight.
+- **Friendlier feedback** — "Nice work, Addie!", "So close!",
+  "Yay, Addie!" — the encounter calls the player by name and softens
+  the tone after wrong answers.
+- **Personalized `addie` question category** — 18 brand-new questions
+  that name-drop Addie ("Addie has 2 🍎 and finds 1 more — how many
+  apples?", "How do you spell Addie's name?", "Addie's favorite
+  Pokémon is yellow and zaps — who is it?"). The category is wired
+  into Grass / Electric / Fairy / Normal Pokémon, so it shows up on
+  the cuter encounters and not the scary ones.
+- **HUD greeting** — the always-on top bar now leads with "🌸 Addie's
+  Adventure" on the cream Animal-Crossing strip.
+- **Generator knows the new category** — `scripts/generate-questions.mjs`
+  has an `addie` entry, so re-running it asks Claude Opus 4.7 for a fresh
+  batch of personalized prompts in the same style.
 
 ## What's new in Slice 3
 
