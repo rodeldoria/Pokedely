@@ -59,6 +59,10 @@ export default class BootScene extends Phaser.Scene {
     drawPokeball(g, 24);
     g.generateTexture('pokeball', 24, 24); g.clear();
 
+    // --- Berry ---
+    drawBerry(g, 24);
+    g.generateTexture('berry', 24, 24); g.clear();
+
     // --- Pokemon Center roof prop (32 x 48) ---
     drawPokeCenter(g);
     g.generateTexture('pokecenter', 96, 80); g.clear();
@@ -201,6 +205,25 @@ function drawPokeball(g, S) {
   g.fillCircle(S / 2, S / 2, 5);
   g.fillStyle(0xf2f2f2, 1);
   g.fillCircle(S / 2, S / 2, 3);
+}
+
+function drawBerry(g, S) {
+  // Strawberry-style berry: red body, green leaves, tiny seeds.
+  g.fillStyle(0xe23b3b, 1);
+  g.fillCircle(S / 2, S / 2 + 2, S / 2 - 3);
+  g.fillStyle(0xff5c5c, 1);
+  g.fillCircle(S / 2 - 3, S / 2 - 1, 4);
+  // Leaves
+  g.fillStyle(0x3aa84a, 1);
+  g.fillTriangle(S / 2 - 8, 6, S / 2, 2, S / 2, 8);
+  g.fillTriangle(S / 2 + 8, 6, S / 2, 2, S / 2, 8);
+  g.fillTriangle(S / 2 - 4, 4, S / 2 + 4, 4, S / 2, 10);
+  // Seeds
+  g.fillStyle(0xfff2a8, 1);
+  g.fillRect(S / 2 - 4, S / 2 + 1, 2, 2);
+  g.fillRect(S / 2 + 3, S / 2 + 4, 2, 2);
+  g.fillRect(S / 2,     S / 2 + 7, 2, 2);
+  g.fillRect(S / 2 - 5, S / 2 + 6, 2, 2);
 }
 
 function drawPokeCenter(g) {

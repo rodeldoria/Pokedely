@@ -4,6 +4,7 @@ import WorldScene from './scenes/WorldScene.js';
 import EncounterScene from './scenes/EncounterScene.js';
 import TeamScene from './scenes/TeamScene.js';
 import HudScene from './scenes/HudScene.js';
+import InteriorScene from './scenes/InteriorScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -14,7 +15,7 @@ const config = {
   backgroundColor: '#7cc25e',
   physics: { default: 'arcade', arcade: { debug: false } },
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [BootScene, WorldScene, HudScene, EncounterScene, TeamScene]
+  scene: [BootScene, WorldScene, HudScene, EncounterScene, TeamScene, InteriorScene]
 };
 
 new Phaser.Game(config);
