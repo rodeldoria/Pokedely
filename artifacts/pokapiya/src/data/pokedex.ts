@@ -112,9 +112,26 @@ const KANTO: [number, string, string[], number][] = [
   [470,'Leafeon',['grass'],3],[471,'Glaceon',['ice'],3],[700,'Sylveon',['fairy'],3],
 ];
 
-export function pickByType(...wantedTypes: string[]): Pokemon {
-  const matches = KANTO.filter(p => p[2].some(t => wantedTypes.includes(t)));
-  if (matches.length === 0) return pickRandom();
+// Progressive Pokédex unlock: at low levels Addie meets early-Kanto mons
+// (Pidgey, Caterpie, Pikachu…); later levels open up higher-dex species
+// so she gets a sense of the games' chronology.
+export function maxDexForLevel(playerLevel: number): number {
+  if (playerLevel <= 2) return 30;
+  if (playerLevel <= 4) return 60;
+  if (playerLevel <= 6) return 100;
+  if (playerLevel <= 9) return 150;
+  return 9999;
+}
+
+// Wild Pokémon should always be a touch weaker than Addie so battles feel fair.
+export function wildLevelFor(playerLevel: number): number {
+  return Math.max(1, playerLevel - 1 - Math.floor(Math.random() * 2));
+}
+
+export function pickByType(wantedTypes: string[], playerLevel?: number): Pokemon {
+  const maxDex = playerLevel === undefined ? Infinity : maxDexForLevel(playerLevel);
+  const matches = KANTO.filter(p => p[2].some(t => wantedTypes.includes(t)) && p[0] <= maxDex);
+  if (matches.length === 0) return pickRandom(playerLevel);
   const weights = matches.map(p => ({ tier: p[3], row: p }));
   const totalWeight = weights.reduce((s, w) => s + (w.tier === 1 ? 4 : w.tier === 2 ? 2 : 1), 0);
   let r = Math.random() * totalWeight;
@@ -157,10 +174,13 @@ const EARLY_KANTO_SPAWNS: { id: number; weight: number }[] = [
   { id: 7,  weight: 1 },  // Squirtle (very rare)
 ];
 
-export function pickEarlyKanto(): Pokemon {
-  const total = EARLY_KANTO_SPAWNS.reduce((s, e) => s + e.weight, 0);
+export function pickEarlyKanto(playerLevel?: number): Pokemon {
+  const maxDex = playerLevel === undefined ? Infinity : maxDexForLevel(playerLevel);
+  const pool = EARLY_KANTO_SPAWNS.filter(e => e.id <= maxDex);
+  const usable = pool.length > 0 ? pool : EARLY_KANTO_SPAWNS.filter(e => e.id <= 20);
+  const total = usable.reduce((s, e) => s + e.weight, 0);
   let r = Math.random() * total;
-  for (const e of EARLY_KANTO_SPAWNS) {
+  for (const e of usable) {
     r -= e.weight;
     if (r <= 0) return byId(e.id) || byId(16)!;
   }
@@ -168,18 +188,19 @@ export function pickEarlyKanto(): Pokemon {
 }
 
 // Biome-specific picker used by the multi-zone overworld.
-export function pickForZone(zoneId: string): Pokemon {
+export function pickForZone(zoneId: string, playerLevel?: number): Pokemon {
   switch (zoneId) {
-    case 'meadow':   return pickByType('bug', 'grass');
-    case 'mountain': return pickByType('rock', 'ground', 'flying');
-    case 'cave':     return pickByType('rock', 'ghost', 'poison');
+    case 'meadow':   return pickByType(['bug', 'grass'], playerLevel);
+    case 'mountain': return pickByType(['rock', 'ground', 'flying'], playerLevel);
+    case 'cave':     return pickByType(['rock', 'ghost', 'poison'], playerLevel);
     case 'town':
-    default:         return pickEarlyKanto();
+    default:         return pickEarlyKanto(playerLevel);
   }
 }
 
-export function pickRandom(): Pokemon {
-  const weights = KANTO.map(p => ({ tier: p[3], row: p }));
+export function pickRandom(playerLevel?: number): Pokemon {
+  const maxDex = playerLevel === undefined ? Infinity : maxDexForLevel(playerLevel);
+  const weights = KANTO.filter(p => p[0] <= maxDex).map(p => ({ tier: p[3], row: p }));
   const totalWeight = weights.reduce((s, w) => s + (w.tier === 1 ? 5 : w.tier === 2 ? 2 : 1), 0);
   let r = Math.random() * totalWeight;
   for (const w of weights) {

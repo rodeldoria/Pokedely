@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
-import { spriteUrl, pickRandom, byId, pickByType, pickForZone, displayName, type Pokemon } from '../data/pokedex';
-import { save, recordEncounter, takeItem, cutTree, setZone, type TrainerState } from '../game/save';
+import { spriteUrl, pickRandom, byId, pickByType, pickForZone, maxDexForLevel, displayName, type Pokemon } from '../data/pokedex';
+import { save, recordEncounter, takeItem, cutTree, setZone, getLevel, type TrainerState } from '../game/save';
 
 const TS = 32;
 const CANVAS_W = 960;
@@ -311,7 +311,7 @@ function update(
       const got = Math.random() < 0.78;
       gs.fishing = null;
       if (got) {
-        const wild = pickByType('water');
+        const wild = pickByType(['water'], getLevel(gs.state));
         recordEncounter(gs.state, wild);
         stateRef.current = gs.state;
         save(gs.state);
@@ -512,7 +512,10 @@ function update(
       if (Math.random() < 0.22) {
         gs.encounterCooldown = 1.8;
         const biasedId = gs.biasMonId;
-        const wild = (biasedId && Math.random() < 0.7) ? (byId(biasedId) || pickForZone(gs.zoneId)) : pickForZone(gs.zoneId);
+        const lvl = getLevel(gs.state);
+        const maxDex = maxDexForLevel(lvl);
+        const useBias = !!(biasedId && Math.random() < 0.7 && biasedId <= maxDex);
+        const wild = useBias ? (byId(biasedId!) || pickForZone(gs.zoneId, lvl)) : pickForZone(gs.zoneId, lvl);
         recordEncounter(gs.state, wild);
         stateRef.current = gs.state;
         save(gs.state);

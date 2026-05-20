@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Pokemon } from '../data/pokedex';
-import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl } from '../data/pokedex';
+import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, wildLevelFor } from '../data/pokedex';
 import { questionFor } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import {
@@ -96,7 +96,16 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const myMember: PartyMember | null = state.team[0] || null;
   if (myMember) ensureMemberHp(myMember, level);
 
-  const wildMaxHp = useMemo(() => 40 + wild.rarity * 18 + level * 4, [wild, level]);
+  // Wild Pokémon are kept slightly weaker than Addie's level so battles
+  // feel fair. Trainer-owned mons stay at Addie's level so battles are still
+  // a real challenge.
+  const wildLevel = useMemo(
+    () => trainerName ? level : wildLevelFor(level),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [wild.id, trainerName, level],
+  );
+
+  const wildMaxHp = useMemo(() => 40 + wild.rarity * 18 + wildLevel * 4, [wild, wildLevel]);
   const [wildHp, setWildHp] = useState(wildMaxHp);
   const [myHpDisplay, setMyHpDisplay] = useState(myMember?.hp ?? 0);
 
@@ -191,7 +200,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       const lead = state.team[0];
       if (!lead) return;
       ensureMemberHp(lead, level);
-      const dmg = calcDamage(wildMove, lead.types, Math.max(1, Math.floor(level * 0.8)));
+      const dmg = calcDamage(wildMove, lead.types, Math.max(1, Math.floor(wildLevel * 0.8)));
       const newMyHp = Math.max(0, (lead.hp ?? lead.maxHp ?? 0) - dmg);
       commitMyHp(newMyHp);
       if (newMyHp <= 0) {
@@ -441,7 +450,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
 
         {/* Wild HP card (top-left) */}
         <RetroHpCard
-          name={displayName(wild)} level={level} typeLabel={wildType} stars={rarityStars}
+          name={displayName(wild)} level={wildLevel} typeLabel={wildType} stars={rarityStars}
           hp={wildHp} max={wildMaxHp} color={wildHpColor}
           showHpNums showExp={false}
           style={{ position: 'absolute', left: 28, top: 22, minWidth: 280 }}
