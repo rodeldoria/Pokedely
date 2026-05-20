@@ -14,9 +14,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.replit.pokapiyamobile"
     },
-    "android": {},
+    "android": {
+      "package": "com.replit.pokapiyamobile"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
