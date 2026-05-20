@@ -9,10 +9,11 @@ import StarterModal from './components/StarterModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, earnCoins, type TrainerState } from './game/save';
-import { checkEvolutions } from './game/evolution';
 import QuestModal from './components/QuestModal';
 import MovesModal from './components/MovesModal';
 import CraftModal from './components/CraftModal';
+import EvolutionModal from './components/EvolutionModal';
+import { pendingEvolutions, evolveMember, declineEvolution, type PendingEvolution } from './game/evolution';
 import type { Pokemon } from './data/pokedex';
 import type { NPCTrainer } from './game/world';
 
@@ -80,22 +81,41 @@ export default function App() {
     forceUpdate(n => n + 1);
   }, [wildPokemon, currentTrainer, showToast]);
 
+  const [evoPending, setEvoPending] = useState<PendingEvolution | null>(null);
+
   const handleStateChange = useCallback((newState: TrainerState) => {
-    // Check for evolutions before persisting — any team member that crossed
-    // its threshold gets its id/name/types updated in-place.
-    const evos = checkEvolutions(newState);
     stateRef.current = newState;
     save(newState);
     forceUpdate(n => n + 1);
-    if (evos.length > 0) {
-      // Queue one toast per evolution, spaced apart so they don't overlap.
-      evos.forEach((evo, i) => {
-        setTimeout(() => {
-          showToast(`✨ ${evo.beforeName} evolved into ${evo.afterName}!`);
-        }, i * 2600);
-      });
-    }
-  }, [showToast]);
+    // If any team member is ready to evolve, surface the first one as a modal.
+    // The player explicitly confirms or declines — no automatic evolution and
+    // no new moves are learned.
+    const pend = pendingEvolutions(newState);
+    if (pend.length > 0) setEvoPending(pend[0]);
+  }, []);
+
+  const handleEvolveConfirm = useCallback(() => {
+    if (!evoPending) return;
+    const evt = evolveMember(stateRef.current, evoPending.memberIndex);
+    save(stateRef.current);
+    setEvoPending(null);
+    forceUpdate(n => n + 1);
+    if (evt) showToast(`✨ ${evt.beforeName} evolved into ${evt.afterName}!`);
+    // Chain into the next pending evolution, if any.
+    setTimeout(() => {
+      const next = pendingEvolutions(stateRef.current);
+      if (next.length > 0) setEvoPending(next[0]);
+    }, 200);
+  }, [evoPending, showToast]);
+
+  const handleEvolveCancel = useCallback(() => {
+    if (!evoPending) return;
+    declineEvolution(stateRef.current, evoPending.memberIndex);
+    save(stateRef.current);
+    setEvoPending(null);
+    forceUpdate(n => n + 1);
+    showToast(`${evoPending.beforeName} stayed the same.`);
+  }, [evoPending, showToast]);
 
   const handlePokecenterClose = useCallback(() => {
     // Nudge the player off the door tile so the center doesn't immediately re-open.

@@ -113,40 +113,73 @@ export interface EvolutionEvent {
   afterName: string;
 }
 
-export function checkEvolutions(state: TrainerState): EvolutionEvent[] {
-  const events: EvolutionEvent[] = [];
-  for (const member of state.team) {
-    const evolved = tryEvolveMember(member, state);
-    if (evolved) events.push(evolved);
-  }
-  return events;
+// Find every team member that is *ready* to evolve but hasn't been evolved
+// yet. The player is prompted (via EvolutionModal) and can confirm or decline.
+// No moves are learned as part of evolution — the move list stays exactly as
+// it was before.
+export interface PendingEvolution {
+  member: PartyMember;
+  memberIndex: number;
+  beforeId: number;
+  beforeName: string;
+  afterId: number;
+  afterName: string;
 }
 
-function tryEvolveMember(member: PartyMember, state: TrainerState): EvolutionEvent | null {
+export function pendingEvolutions(state: TrainerState): PendingEvolution[] {
+  const out: PendingEvolution[] = [];
+  state.team.forEach((member, memberIndex) => {
+    const evo = EVO_BY_FROM.get(member.id);
+    if (!evo) return;
+    const baseline = member.correctAtCatch ?? 0;
+    const since = state.stats.correct - baseline;
+    if (since < evo.correctNeeded) return;
+    const target = byId(evo.to);
+    if (!target) return;
+    out.push({
+      member,
+      memberIndex,
+      beforeId: evo.from,
+      beforeName: member.name,
+      afterId: target.id,
+      afterName: target.name,
+    });
+  });
+  return out;
+}
+
+// Confirm an evolution: swap the member's id/name/types in place. Move list
+// is intentionally untouched — no new moves are learned.
+export function evolveMember(state: TrainerState, memberIndex: number): EvolutionEvent | null {
+  const member = state.team[memberIndex];
+  if (!member) return null;
   const evo = EVO_BY_FROM.get(member.id);
   if (!evo) return null;
-
-  // correctAtCatch is only stored on members caught after the slice-5 update.
-  // Older saves can still evolve — they just need `correctNeeded` total
-  // correct answers from now (counted from the slice-5 boot).
-  const baseline = member.correctAtCatch ?? 0;
-  const since = state.stats.correct - baseline;
-  if (since < evo.correctNeeded) return null;
-
   const target = byId(evo.to);
   if (!target) return null;
 
   const beforeName = member.name;
+  const beforeId = member.id;
   member.id = target.id;
   member.name = target.name;
   member.types = target.types;
-  // Reset baseline so the next stage requires its own correctNeeded progress.
   member.correctAtCatch = state.stats.correct;
+  return { beforeId, beforeName, afterId: target.id, afterName: target.name };
+}
 
-  return {
-    beforeId: evo.from,
-    beforeName,
-    afterId: target.id,
-    afterName: target.name
-  };
+// Decline an evolution: bump the baseline so the prompt doesn't re-appear
+// until the trainer earns another full `correctNeeded` chunk of XP.
+export function declineEvolution(state: TrainerState, memberIndex: number) {
+  const member = state.team[memberIndex];
+  if (!member) return;
+  member.correctAtCatch = state.stats.correct;
+}
+
+// Legacy auto-evolve path — kept so older call sites don't break, but it now
+// only returns the pending list without mutating. App.tsx drives the modal.
+export function checkEvolutions(state: TrainerState): EvolutionEvent[] {
+  return pendingEvolutions(state).map(p => ({
+    beforeId: p.beforeId, beforeName: p.beforeName,
+    afterId: p.afterId, afterName: p.afterName,
+  }));
 }
