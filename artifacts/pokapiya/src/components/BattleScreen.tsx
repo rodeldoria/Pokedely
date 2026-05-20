@@ -121,6 +121,9 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const [myHurt, setMyHurt] = useState(false);
   const [monVisible, setMonVisible] = useState(false);
   const [caught, setCaught] = useState(false);
+  const [attacker, setAttacker] = useState<null | 'me' | 'wild'>(null);
+  const [wildFainted, setWildFainted] = useState(false);
+  const [myFainted, setMyFainted] = useState(false);
   const exited = useRef(false);
   // Bumped whenever the active lead changes (e.g., swap) so queued
   // enemy-turn timers can no-op rather than hit the wrong Pokémon.
@@ -169,7 +172,9 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     setPhase('animating');
     setLog(`${myMember?.name} used ${m.name}! ${m.emoji}`);
     const dmg = calcDamage(m, wild.types, level);
-    setTimeout(() => setWildHurt(true), 150);
+    setAttacker('me');
+    setTimeout(() => setWildHurt(true), 320);
+    setTimeout(() => setAttacker(null), 520);
     setTimeout(() => {
       const newHp = Math.max(0, wildHp - dmg);
       setWildHp(newHp);
@@ -177,7 +182,9 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       if (eff > 1) setFeedback("It's super effective!");
       else setFeedback('');
       if (newHp <= 0) {
-        setTimeout(() => onWildFaint(), 700);
+        setWildHurt(false);
+        setWildFainted(true);
+        setTimeout(() => onWildFaint(), 1000);
       } else {
         setTimeout(() => enemyTurn(), 900);
       }
@@ -193,7 +200,9 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     const wildMove = getMoves(wild.types)[Math.random() < 0.5 ? 0 : 1];
     setLog(`Wild ${displayName(wild)} used ${wildMove.name}! ${wildMove.emoji}`);
     setFeedback('');
-    setTimeout(() => setMyHurt(true), 150);
+    setAttacker('wild');
+    setTimeout(() => setMyHurt(true), 320);
+    setTimeout(() => setAttacker(null), 520);
     setTimeout(() => {
       // Re-read the lead at execution time and bail if a swap happened.
       if (turnToken.current !== token) return;
@@ -204,7 +213,9 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       const newMyHp = Math.max(0, (lead.hp ?? lead.maxHp ?? 0) - dmg);
       commitMyHp(newMyHp);
       if (newMyHp <= 0) {
-        setTimeout(() => onMyFaint(), 700);
+        setMyHurt(false);
+        setMyFainted(true);
+        setTimeout(() => onMyFaint(), 1000);
       } else {
         setTimeout(() => { setPhase('menu'); setLog('What will you do?'); }, 700);
       }
@@ -383,6 +394,24 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const myType = (myMember?.types[0] || 'normal').toUpperCase();
   const wildType = wild.types[0].toUpperCase();
 
+  // Idle bob plays when nobody is mid-action so battlers feel alive between turns.
+  const idleish = phase === 'menu' || phase === 'fightMenu' || phase === 'swapMenu' || phase === 'question';
+
+  const wildAnim = shaking ? 'shake 0.15s infinite'
+    : wildFainted ? 'faintFall 0.9s ease-in forwards'
+    : wildHurt ? 'shake 0.12s 3'
+    : attacker === 'wild' ? 'lungeWild 0.5s ease-out'
+    : caught ? 'none'
+    : idleish && monVisible ? 'idleBob 2.6s ease-in-out infinite'
+    : monVisible ? 'popIn 0.5s ease-out'
+    : 'none';
+
+  const myAnim = myFainted ? 'faintFall 0.9s ease-in forwards'
+    : myHurt ? 'shake 0.12s 3'
+    : attacker === 'me' ? 'lungePlayer 0.5s ease-out'
+    : idleish ? 'idleBob 2.6s ease-in-out 0.4s infinite'
+    : 'none';
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 400,
@@ -411,7 +440,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         <div style={{
           position: 'absolute', right: '8%', top: '10%',
           width: 200, height: 200,
-          animation: shaking ? 'shake 0.15s infinite' : wildHurt ? 'shake 0.12s 3' : monVisible ? 'popIn 0.5s ease-out' : 'none',
+          animation: wildAnim,
+          transformOrigin: 'center bottom',
           filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
         }}>
           <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
@@ -437,7 +467,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         <div style={{
           position: 'absolute', left: '14%', bottom: '4%',
           width: 220, height: 220,
-          animation: myHurt ? 'shake 0.12s 3' : 'none',
+          animation: myAnim,
+          transformOrigin: 'center bottom',
           filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
         }}>
           {myMember && (
@@ -654,6 +685,27 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       <style>{`
         @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+        @keyframes idleBob {
+          0%,100% { transform: translateY(0) scale(1); }
+          50%     { transform: translateY(-8px) scale(1.02); }
+        }
+        @keyframes lungePlayer {
+          0%   { transform: translate(0,0) scale(1); }
+          45%  { transform: translate(110px,-90px) scale(1.08); }
+          70%  { transform: translate(90px,-70px) scale(1.05); }
+          100% { transform: translate(0,0) scale(1); }
+        }
+        @keyframes lungeWild {
+          0%   { transform: translate(0,0) scale(1); }
+          45%  { transform: translate(-110px,80px) scale(1.08); }
+          70%  { transform: translate(-90px,65px) scale(1.05); }
+          100% { transform: translate(0,0) scale(1); }
+        }
+        @keyframes faintFall {
+          0%   { transform: translateY(0) rotate(0deg); opacity: 1; filter: brightness(1); }
+          40%  { transform: translateY(-12px) rotate(15deg); opacity: 1; }
+          100% { transform: translateY(80px) rotate(90deg); opacity: 0; filter: brightness(0.5) grayscale(0.7); }
+        }
       `}</style>
       {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
       <span style={{ display: 'none' }}>{trainerReward}{bg}{text}</span>
