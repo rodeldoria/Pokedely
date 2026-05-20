@@ -842,51 +842,56 @@ function drawAmbientMon(ctx: CanvasRenderingContext2D, a: AmbientMon, sx: number
 // 14×20 pixel sprites, scale 2 → 28×40 actual. Feet at (sx, sy).
 const PLAYER_PALETTE: Record<string, string> = {
   K: '#1a0d00', // outline
-  R: '#d63946', // red
-  r: '#9c2632', // dark red
-  w: '#ffffff',
+  R: '#ef4036', // cap red
+  r: '#a82e22', // cap shadow
+  w: '#ffffff', // hat band + buttons
   W: '#e8d8c8',
-  s: '#f3c6a5', // skin
+  s: '#f7d4b3', // skin
   S: '#d4a17a', // skin shadow
-  h: '#6b3e1f', // hair
-  H: '#8b5a2b', // hair highlight
-  b: '#2a3a78', // jeans
-  B: '#3a4d9c', // jeans highlight
-  y: '#ffd54a',
-  p: '#1a1a2e',
-  m: '#a04444',
+  h: '#5a3318', // hair (brown ponytail)
+  H: '#8a5a2b', // hair highlight
+  b: '#2a3a78', // skirt shadow
+  B: '#3a4d9c', // skirt
+  y: '#ffd54a', // hair tie / hat emblem
+  p: '#231a10', // shoes
+  m: '#7a3324', // mouth
+  P: '#ff8fb1', // shirt pink
+  Q: '#c95f85', // shirt shadow
 };
 
+// Addie — front view. Red cap with yellow emblem, brown ponytail flicked
+// to the right, pink shirt, blue skirt. 14×20 grid.
 const PLAYER_DOWN_A = [
   '....KKKKKK....',
-  '...KRRRRRRK...',
+  '...KRRyRRRK...',
   '...KRwwwwRK...',
-  '...KRwKKwRK...',
   '...KKKKKKKK...',
-  '...HsssssssH..',
-  '..HsssKsKsssH.',
-  '..HsssssssssH.',
-  '...sssssssss..',
-  '...sSmmmmmSs..',
-  '....sssssss...',
-  '...KRRRRRRRK..',
-  '..KRwwwwwwRK..',
-  '..KRRRRRRRRK..',
-  '..sKyyyyyKs...',
-  '..sKBBBBBKs...',
-  '...KbbbbbbK...',
+  '....hhsssHh...',
+  '...hsssssshy..',
+  '...hsKssKshh..',
+  '...HssssssshH.',
+  '....smmmms....',
+  '.....KsssK....',
+  '....KPPPPPK...',
+  '...KPwPPPwPK..',
+  '..KPPPPPPPPK..',
+  '..KPPPPPPPPK..',
+  '..sKQQQQQQKs..',
+  '...KBBBBBBK...',
+  '...KBbbbbBK...',
   '...Kbb..bbK...',
-  '...Kbb..bbK...',
-  '...pppppppp...',
+  '...KK....KK...',
+  '...pp....pp...',
 ];
 const PLAYER_DOWN_B = [
-  ...PLAYER_DOWN_A.slice(0, 16),
-  '...Kbb..bbK...',
-  '....b....b....',
-  '....b....b....',
-  '....p....p....',
+  ...PLAYER_DOWN_A.slice(0, 17),
+  '...Kbbb.bbbK..',
+  '....KK...KK...',
+  '....pp...pp...',
 ];
 
+// Back view — ponytail clearly visible down the back so it doesn't read
+// as a bald head. Tie is the yellow pixel near the top of the ponytail.
 const PLAYER_UP_A = [
   '....KKKKKK....',
   '...KRRRRRRK...',
@@ -894,56 +899,56 @@ const PLAYER_UP_A = [
   '...KKKKKKKK...',
   '...hhhhhhhh...',
   '..hHhhhhhhHh..',
-  '..hhhhhhhhhh..',
-  '..hhhhhhhhhh..',
-  '...hhhhhhhh...',
-  '....hhhhhh....',
-  '....hhhhhh....',
-  '...KRRRRRRRK..',
-  '..KRRRRRRRRK..',
-  '..KRRRRRRRRK..',
-  '..sKRRRRRRKs..',
-  '..sKyyyyyKs...',
-  '...KbbbbbbK...',
+  '..hhhhyhhhhh..',
+  '...hhhHHhhh...',
+  '....hHHHHh....',
+  '.....hHHh.....',
+  '....KPPPPPK...',
+  '...KPPPPPPPK..',
+  '..KPPPPPPPPK..',
+  '..KPPPPPPPPK..',
+  '..sKQQQQQQKs..',
+  '...KBBBBBBK...',
+  '...KBbbbbBK...',
   '...Kbb..bbK...',
-  '...Kbb..bbK...',
-  '...pppppppp...',
+  '...KK....KK...',
+  '...pp....pp...',
 ];
 const PLAYER_UP_B = [
-  ...PLAYER_UP_A.slice(0, 16),
-  '...Kbb..bbK...',
-  '....b....b....',
-  '....b....b....',
-  '....p....p....',
+  ...PLAYER_UP_A.slice(0, 17),
+  '...Kbbb.bbbK..',
+  '....KK...KK...',
+  '....pp...pp...',
 ];
 
+// Side (right). Ponytail bobs behind the head with a yellow tie.
 const PLAYER_RIGHT_A = [
   '....KKKKK.....',
-  '...KRRRRRK....',
+  '...KRRyRRK....',
   '...KRwwwRK....',
-  '...KRwKwRK....',
   '...KKKKKKK....',
-  '....sssshh....',
-  '...Hssssshh...',
-  '...HssKssh....',
-  '...HssssshH...',
-  '....smmms.....',
-  '.....sssss....',
-  '....KRRRRR....',
-  '...KRwwRRRK...',
-  '..KRRRRRRRK...',
-  '..KRRRRRRsK...',
-  '..KyyyyyysK...',
-  '...KBBBBBK....',
-  '....KbbbbK....',
+  '...hssshhh....',
+  '..hssssshhy...',
+  '..hssKsshhH...',
+  '..HsssssshH...',
+  '...smmms......',
+  '....KsssK.....',
+  '....KPPPPK....',
+  '...KPwPPPK....',
+  '..KPPPPPPK....',
+  '..KPPPPPPK....',
+  '...sKQQQKs....',
+  '....KBBBBK....',
+  '....KBbbbK....',
   '....Kbb.bK....',
-  '....pppppp....',
+  '....KK..K.....',
+  '....pp..p.....',
 ];
 const PLAYER_RIGHT_B = [
   ...PLAYER_RIGHT_A.slice(0, 17),
-  '....Kbbbb.....',
-  '.....bbb......',
-  '.....ppp......',
+  '....KbbbK.....',
+  '....K..KK.....',
+  '....p..pp.....',
 ];
 
 function mirrorArt(rows: string[]): string[] {
