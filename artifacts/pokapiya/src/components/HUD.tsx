@@ -2,6 +2,7 @@ import { getLevel, xpToNextLevel, type TrainerState } from '../game/save';
 
 interface Props {
   state: TrainerState;
+  zoneName: string;
   onTeam: () => void;
   onPokedex: () => void;
   onQuests: () => void;
@@ -11,7 +12,7 @@ interface Props {
   toast: string;
 }
 
-export default function HUD({ state, onTeam, onPokedex, onQuests, onMoves, onCraft, onSave, toast }: Props) {
+export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMoves, onCraft, onSave, toast }: Props) {
   const total = state.stats.correct + state.stats.wrong;
   const acc = total > 0 ? Math.round((state.stats.correct / total) * 100) : 100;
   const level = getLevel(state);
@@ -50,6 +51,7 @@ export default function HUD({ state, onTeam, onPokedex, onQuests, onMoves, onCra
           <Chip label="🍓" value={`${state.inventory.berry}`} />
           <Chip label="🪙" value={`${state.inventory.coin || 0}`} />
           <Chip label="🧠" value={`${acc}%`} />
+          <Chip label="📍" value={zoneName} />
           {state.inventory.cut > 0 && <Badge>✂️ Cut</Badge>}
           {state.inventory.rod > 0 && <Badge>🎣 Rod</Badge>}
         </div>

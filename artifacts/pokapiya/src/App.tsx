@@ -125,6 +125,7 @@ export default function App() {
   }, [screen]);
 
   const trainerState = stateRef.current;
+  const zoneName = gameRef.current?.getZoneName() ?? 'Town';
 
   return (
     <div style={{
@@ -144,6 +145,7 @@ export default function App() {
       {screen === 'world' && (
         <HUD
           state={trainerState}
+          zoneName={zoneName}
           onTeam={() => setScreen('team')}
           onPokedex={() => setScreen('pokedex')}
           onQuests={() => setScreen('quests')}

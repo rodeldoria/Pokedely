@@ -280,7 +280,7 @@ function generateMeadow(): WorldMap {
   for (let i = 0; i < 18; i++) {
     const x = 3 + Math.floor(rng() * (width - 6));
     const y = 3 + Math.floor(rng() * (height - 6));
-    if (map[y][x] === TILE.GRASS && map[y][x] !== TILE.PATH) map[y][x] = TILE.TREE;
+    if (map[y][x] === TILE.GRASS) map[y][x] = TILE.TREE;
   }
 
   return {

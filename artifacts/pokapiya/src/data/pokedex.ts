@@ -144,6 +144,17 @@ export function pickEarlyKanto(): Pokemon {
   return byId(16)!;
 }
 
+// Biome-specific picker used by the multi-zone overworld.
+export function pickForZone(zoneId: string): Pokemon {
+  switch (zoneId) {
+    case 'meadow':   return pickByType('bug', 'grass');
+    case 'mountain': return pickByType('rock', 'ground', 'flying');
+    case 'cave':     return pickByType('rock', 'ghost', 'poison');
+    case 'town':
+    default:         return pickEarlyKanto();
+  }
+}
+
 export function pickRandom(): Pokemon {
   const weights = KANTO.map(p => ({ tier: p[3], row: p }));
   const totalWeight = weights.reduce((s, w) => s + (w.tier === 1 ? 5 : w.tier === 2 ? 2 : 1), 0);

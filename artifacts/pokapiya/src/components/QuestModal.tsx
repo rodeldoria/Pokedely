@@ -96,9 +96,21 @@ const QUESTS: Quest[] = [
   },
   {
     id: 'catch-bug',
-    label: 'Catch a Bug-type Pokémon',
-    detail: 'Caterpie and Weedle are easy first bug catches.',
+    label: 'Catch a Bug-type Pokémon in the Meadow',
+    detail: 'Head south from Town to the Meadow Route — Caterpie and Weedle love it there!',
     done: s => teamHasType(s, 'bug')
+  },
+  {
+    id: 'mountain-rock',
+    label: 'Hike the Mountain Trail and catch a Rock-type',
+    detail: 'Go north from Town to the Mountain Trail. Geodude, Onix, and friends are waiting up the rocky path.',
+    done: s => teamHasType(s, 'rock')
+  },
+  {
+    id: 'cave-ghost-poison',
+    label: 'Explore the Rocky Cave and catch a Ghost or Poison-type',
+    detail: 'Push through the Mountain Trail to reach the dark Rocky Cave. Watch for Zubat, Gastly, and Koffing!',
+    done: s => teamHasType(s, 'ghost') || teamHasType(s, 'poison')
   },
   {
     id: 'twenty-correct',

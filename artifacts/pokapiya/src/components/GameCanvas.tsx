@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { TILE, generateMap, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, type TileCode, type WorldMap, type NPCTrainer } from '../game/world';
-import { spriteUrl, pickRandom, pickEarlyKanto, byId, pickByType, type Pokemon } from '../data/pokedex';
-import { save, recordEncounter, takeItem, cutTree, type TrainerState } from '../game/save';
+import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
+import { spriteUrl, pickRandom, byId, pickByType, pickForZone, displayName, type Pokemon } from '../data/pokedex';
+import { save, recordEncounter, takeItem, cutTree, setZone, type TrainerState } from '../game/save';
 
 const TS = 32;
 const CANVAS_W = 960;
@@ -11,7 +11,7 @@ const JUMP_VEL = -9;
 const GRAVITY = 22;
 
 // Early-Kanto roaming Pokémon — Route 1 / Viridian Forest vibe
-const AMBIENT = [
+const TOWN_AMBIENT = [
   { id: 16, sx: 20, sy: 10, greet: "Pidgey! 🪶" },
   { id: 19, sx: 36, sy: 14, greet: "Rattata rat! 🐭" },
   { id: 10, sx: 12, sy: 28, greet: "Caterpie! 🐛" },
@@ -20,6 +20,39 @@ const AMBIENT = [
   { id: 129,sx: 10, sy: 32, greet: "Karp karp! 🐟" },
   { id: 133,sx: 16, sy: 20, greet: "Eevee! 🦊" },
 ];
+
+function makeAmbientMons(zoneId: ZoneId, worldMap: WorldMap): AmbientMon[] {
+  if (zoneId === 'town') {
+    return TOWN_AMBIENT.map(a => ({
+      id: a.id, x: a.sx + 0.5, y: a.sy + 0.5,
+      vx: 0, vy: 0, wander: 0, greet: a.greet, img: null,
+      bobTimer: Math.random() * Math.PI * 2,
+    }));
+  }
+  const pool = ZONES[zoneId].ambientIds;
+  const out: AmbientMon[] = [];
+  const count = Math.min(6, pool.length);
+  for (let i = 0; i < count; i++) {
+    const id = pool[i];
+    let tx = Math.floor(worldMap.width / 2);
+    let ty = Math.floor(worldMap.height / 2);
+    for (let tries = 0; tries < 60; tries++) {
+      const cx = 2 + Math.floor(Math.random() * (worldMap.width - 4));
+      const cy = 2 + Math.floor(Math.random() * (worldMap.height - 4));
+      const code = worldMap.map[cy]?.[cx];
+      if (code !== undefined && !isSolid(code as TileCode)) { tx = cx; ty = cy; break; }
+    }
+    const mon = byId(id);
+    out.push({
+      id, x: tx + 0.5, y: ty + 0.5,
+      vx: 0, vy: 0, wander: 0,
+      greet: mon ? `${displayName(mon)}!` : `${id}!`,
+      img: null,
+      bobTimer: Math.random() * Math.PI * 2,
+    });
+  }
+  return out;
+}
 
 interface AmbientMon {
   id: number; x: number; y: number;
@@ -31,6 +64,7 @@ interface TrainerNPC extends NPCTrainer { img: HTMLImageElement | null; bobTimer
 
 interface GameState {
   worldMap: WorldMap;
+  zoneId: ZoneId;
   px: number; py: number;
   pvx: number; pvy: number;
   pz: number; pvz: number;
@@ -53,10 +87,12 @@ interface GameState {
   state: TrainerState;
   lastTime: number;
   doorArmed: boolean;
+  switchZone?: (newId: ZoneId, fromSide: Side) => void;
 }
 
 export interface GameCanvasController {
   exitPokecenter: () => void;
+  getZoneName: () => string;
 }
 
 interface Props {
@@ -91,12 +127,14 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const worldMap = generateMap(48, 36, 7);
-    const { spawn, items: mapItems, trainers } = worldMap.features;
     const trainerState = stateRef.current;
+    const initialZone: ZoneId = trainerState.currentZone || 'town';
+    const worldMap = generateZone(initialZone);
+    const { spawn, items: mapItems, trainers } = worldMap.features;
 
     const gs: GameState = {
       worldMap,
+      zoneId: initialZone,
       px: spawn.x + 0.5, py: spawn.y + 0.5,
       pvx: 0, pvy: 0,
       pz: 0, pvz: 0,
@@ -107,10 +145,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       fJustPressed: false, spaceJustPressed: false,
       encounterCooldown: 0,
       lastTileKey: '',
-      ambientMons: AMBIENT.map(a => ({
-        id: a.id, x: a.sx + 0.5, y: a.sy + 0.5,
-        vx: 0, vy: 0, wander: 0, greet: a.greet, img: null, bobTimer: Math.random() * Math.PI * 2,
-      })),
+      ambientMons: makeAmbientMons(initialZone, worldMap),
       trainers: trainers.map(t => ({ ...t, img: null, bobTimer: Math.random() * Math.PI * 2 })),
       items: mapItems.map(it => ({ tx: it.x, ty: it.y, type: it.type, bobTimer: Math.random() * Math.PI * 2 })),
       images: new Map(),
@@ -123,8 +158,35 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
     };
     gsRef.current = gs;
 
-    for (const a of gs.ambientMons) loadImg(spriteUrl(a.id), gs, img => { a.img = img; });
-    for (const t of gs.trainers) loadImg(spriteUrl(t.pokemonId), gs, img => { t.img = img; });
+    const loadEntitySprites = () => {
+      for (const a of gs.ambientMons) loadImg(spriteUrl(a.id), gs, img => { a.img = img; });
+      for (const t of gs.trainers) loadImg(spriteUrl(t.pokemonId), gs, img => { t.img = img; });
+    };
+    loadEntitySprites();
+
+    // Swap to a new zone, repositioning the player to the matching opposite edge
+    // and rebuilding ambient mons / trainers / items for that map.
+    const doSwitchZone = (newId: ZoneId, fromSide: Side) => {
+      const newMap = generateZone(newId);
+      gs.worldMap = newMap;
+      gs.zoneId = newId;
+      const entry = newMap.features.entries[fromSide] || newMap.features.spawn;
+      gs.px = entry.x + 0.5;
+      gs.py = entry.y + 0.5;
+      gs.pvx = 0; gs.pvy = 0;
+      gs.ambientMons = makeAmbientMons(newId, newMap);
+      gs.trainers = newMap.features.trainers.map(t => ({ ...t, img: null, bobTimer: Math.random() * Math.PI * 2 }));
+      gs.items = newMap.features.items.map(it => ({ tx: it.x, ty: it.y, type: it.type, bobTimer: Math.random() * Math.PI * 2 }));
+      gs.encounterCooldown = 1.0;
+      gs.lastTileKey = '';
+      gs.doorArmed = false;
+      gs.speech = null;
+      loadEntitySprites();
+      setZone(gs.state, newId);
+      stateRef.current = gs.state;
+      callbacksRef.current.onToast(`Welcome to ${ZONES[newId].name}!`);
+    };
+    gs.switchZone = doSwitchZone;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -182,10 +244,16 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
   useEffect(() => {
     if (!controllerRef) return;
     controllerRef.current = {
+      getZoneName: () => {
+        const gs = gsRef.current;
+        if (!gs) return ZONES.town.name;
+        return ZONES[gs.zoneId].name;
+      },
       exitPokecenter: () => {
         const gs = gsRef.current;
         if (!gs) return;
         const door = gs.worldMap.features.door;
+        if (!door) return;
         const { map, width, height } = gs.worldMap;
         // Try south, then east/west/north — first non-solid wins.
         const candidates: Array<[number, number]> = [
@@ -275,11 +343,26 @@ function update(
   // Collision — also treat cut trees as passable
   const collTile = (x: number, y: number) => {
     const t = map[Math.floor(y)]?.[Math.floor(x)] as TileCode;
-    if (isTree(t) && gs.state.cutTrees[`${Math.floor(x)},${Math.floor(y)}`]) return false;
+    if (isTree(t) && gs.state.cutTrees[`${gs.zoneId}:${Math.floor(x)},${Math.floor(y)}`]) return false;
     return isSolid(t);
   };
   if (collTile(npx, gs.py)) npx = gs.px;
   if (collTile(npx, npy)) npy = gs.py;
+
+  // Edge transitions to neighbouring zones. If the player walks off an edge
+  // that has an exit defined, swap zones instead of clamping.
+  const exits = gs.worldMap.exits;
+  const trySwitch = (side: Side): boolean => {
+    const target = exits[side];
+    if (!target || !gs.switchZone) return false;
+    gs.switchZone(target, oppositeSide(side));
+    return true;
+  };
+  if (npy < 0.5 && trySwitch('n')) return;
+  if (npy > height - 0.5 && trySwitch('s')) return;
+  if (npx < 0.5 && trySwitch('w')) return;
+  if (npx > width - 0.5 && trySwitch('e')) return;
+
   npx = Math.max(0.5, Math.min(width - 0.5, npx));
   npy = Math.max(0.5, Math.min(height - 0.5, npy));
   gs.px = npx; gs.py = npy;
@@ -347,10 +430,10 @@ function update(
   // ── F-key actions: fish / cut ─────────────────────────────────────────
   if (gs.fJustPressed) {
     gs.fJustPressed = false;
-    const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees);
+    const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees, gs.zoneId);
     const water = adjacentToWater(map, gs.px, gs.py);
     if (tree && gs.state.inventory.cut > 0) {
-      cutTree(gs.state, tree.x, tree.y);
+      cutTree(gs.state, gs.zoneId, tree.x, tree.y);
       stateRef.current = gs.state;
       gs.toast = { text: "✂️ Cut! The tree fell down!", timer: 1.8 };
       onToast("✂️ Cut! The tree fell down!");
@@ -395,7 +478,7 @@ function update(
       if (Math.random() < 0.22) {
         gs.encounterCooldown = 1.8;
         const biasedId = gs.biasMonId;
-        const wild = (biasedId && Math.random() < 0.7) ? (byId(biasedId) || pickEarlyKanto()) : pickEarlyKanto();
+        const wild = (biasedId && Math.random() < 0.7) ? (byId(biasedId) || pickForZone(gs.zoneId)) : pickForZone(gs.zoneId);
         recordEncounter(gs.state, wild);
         stateRef.current = gs.state;
         save(gs.state);
@@ -408,12 +491,12 @@ function update(
   // Item pickups
   for (let i = gs.items.length - 1; i >= 0; i--) {
     const it = gs.items[i];
-    const key = `${it.tx},${it.ty}`;
+    const key = `${gs.zoneId}:${it.tx},${it.ty}`;
     if (gs.state.worldItems[key]) { gs.items.splice(i, 1); continue; }
     it.bobTimer += dt * 3;
     const dx = gs.px - (it.tx + 0.5), dy = gs.py - (it.ty + 0.5);
     if (Math.sqrt(dx * dx + dy * dy) < 0.7) {
-      if (takeItem(gs.state, it.tx, it.ty, it.type)) {
+      if (takeItem(gs.state, gs.zoneId, it.tx, it.ty, it.type)) {
         gs.items.splice(i, 1);
         stateRef.current = gs.state;
         const label = it.type === 'pokeball' ? 'Poké Ball' : 'Berry';
@@ -424,16 +507,18 @@ function update(
 
   if (gs.toast) { gs.toast.timer -= dt; if (gs.toast.timer <= 0) gs.toast = null; }
 
-  // Door proximity — must step off the door before it can fire again,
-  // otherwise leaving the Pokémon Center immediately re-opens it.
+  // Door proximity — only town has a Pokémon Center. Must step off the door
+  // before it can fire again so leaving the center doesn't immediately re-open it.
   const door = features.door;
-  const ddx = gs.px - (door.x + 0.5), ddy = gs.py - (door.y + 0.5);
-  const onDoor = Math.sqrt(ddx * ddx + ddy * ddy) < 0.7;
-  if (!onDoor) gs.doorArmed = true;
-  if (onDoor && gs.doorArmed) {
-    gs.doorArmed = false;
-    save(gs.state); stateRef.current = gs.state;
-    onPokecenter();
+  if (door && gs.zoneId === 'town') {
+    const ddx = gs.px - (door.x + 0.5), ddy = gs.py - (door.y + 0.5);
+    const onDoor = Math.sqrt(ddx * ddx + ddy * ddy) < 0.7;
+    if (!onDoor) gs.doorArmed = true;
+    if (onDoor && gs.doorArmed) {
+      gs.doorArmed = false;
+      save(gs.state); stateRef.current = gs.state;
+      onPokecenter();
+    }
   }
 }
 
@@ -443,7 +528,7 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   if (!ctx) return;
   const { worldMap: { map, width, height, features }, camX, camY } = gs;
 
-  ctx.fillStyle = '#87ceeb';
+  ctx.fillStyle = ZONES[gs.zoneId].background;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
   const startTX = Math.floor(camX / TS);
@@ -456,7 +541,7 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
       const code = map[ty]?.[tx];
       const sx = tx * TS - camX, sy = ty * TS - camY;
       // Skip cut trees (they become grass)
-      if (code === TILE.TREE && gs.state.cutTrees[`${tx},${ty}`]) {
+      if (code === TILE.TREE && gs.state.cutTrees[`${gs.zoneId}:${tx},${ty}`]) {
         drawTile(ctx, TILE.GRASS, sx, sy, tx, ty);
         // Show stump
         ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 12, sy + 18, 8, 6);
@@ -467,12 +552,14 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     }
   }
 
-  drawPokecenter(ctx, features.pokeCenter.x * TS - camX, features.pokeCenter.y * TS - camY);
+  if (features.pokeCenter) {
+    drawPokecenter(ctx, features.pokeCenter.x * TS - camX, features.pokeCenter.y * TS - camY);
+  }
 
   for (const sgn of features.signs) drawSign(ctx, sgn.x * TS - camX, sgn.y * TS - camY, sgn.text);
 
   for (const it of gs.items) {
-    if (gs.state.worldItems[`${it.tx},${it.ty}`]) continue;
+    if (gs.state.worldItems[`${gs.zoneId}:${it.tx},${it.ty}`]) continue;
     const sx = (it.tx + 0.5) * TS - camX;
     const sy = (it.ty + 0.5) * TS - camY + Math.sin(it.bobTimer) * 3;
     drawItem(ctx, gs, it.type, sx, sy);
@@ -508,19 +595,21 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   if (gs.speech) drawSpeechBubble(ctx, gs.speech.text, CANVAS_W / 2, CANVAS_H - 110);
   if (gs.toast) drawToast(ctx, gs.toast.text, CANVAS_W / 2, CANVAS_H - 75);
 
-  // Door glow
+  // Door glow (town only)
   const door = features.door;
-  const dsx = door.x * TS - camX, dsy = door.y * TS - camY;
-  const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.25;
-  ctx.fillStyle = `rgba(255, 213, 74, ${pulse * 0.4})`;
-  ctx.fillRect(dsx + 4, dsy + 2, TS - 8, TS - 4);
-  ctx.fillStyle = '#ffd54a';
-  ctx.font = 'bold 9px "Segoe UI"';
-  ctx.textAlign = 'center';
-  ctx.fillText('ENTER', dsx + TS / 2, dsy - 2);
+  if (door && gs.zoneId === 'town') {
+    const dsx = door.x * TS - camX, dsy = door.y * TS - camY;
+    const pulse = 0.5 + Math.sin(Date.now() / 400) * 0.25;
+    ctx.fillStyle = `rgba(255, 213, 74, ${pulse * 0.4})`;
+    ctx.fillRect(dsx + 4, dsy + 2, TS - 8, TS - 4);
+    ctx.fillStyle = '#ffd54a';
+    ctx.font = 'bold 9px "Segoe UI"';
+    ctx.textAlign = 'center';
+    ctx.fillText('ENTER', dsx + TS / 2, dsy - 2);
+  }
 
   // F-prompt: cut tree / fish indicator
-  const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees);
+  const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees, gs.zoneId);
   const water = adjacentToWater(map, gs.px, gs.py);
   if (tree && !gs.fishing) {
     const fx = tree.x * TS - camX + TS / 2, fy = tree.y * TS - camY - 12;
@@ -547,7 +636,21 @@ function drawTile(ctx: CanvasRenderingContext2D, code: TileCode, sx: number, sy:
     case TILE.SAND: drawSand(ctx, sx, sy); break;
     case TILE.FLOWER: drawFlower(ctx, sx, sy, tx, ty); break;
     case TILE.ROCK: drawRock(ctx, sx, sy); break;
+    case TILE.WALL: drawWall(ctx, sx, sy, tx, ty); break;
   }
+}
+
+function drawWall(ctx: CanvasRenderingContext2D, sx: number, sy: number, tx: number, ty: number) {
+  ctx.fillStyle = '#3a3a3f'; ctx.fillRect(sx, sy, TS, TS);
+  ctx.fillStyle = '#2a2a2e';
+  for (let i = 0; i < 4; i++) {
+    const x = sx + ((i * 11 + tx * 5) % (TS - 4));
+    const y = sy + ((i * 7 + ty * 9) % (TS - 4));
+    ctx.fillRect(x, y, 3, 2);
+  }
+  ctx.fillStyle = '#4d4d54';
+  ctx.fillRect(sx + 2, sy + 2, 4, 2);
+  ctx.fillRect(sx + TS - 8, sy + TS - 6, 5, 2);
 }
 
 function drawTallGrass(ctx: CanvasRenderingContext2D, sx: number, sy: number) {

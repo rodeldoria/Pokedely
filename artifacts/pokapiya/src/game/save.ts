@@ -1,4 +1,5 @@
 import type { Pokemon } from '../data/pokedex';
+import { ZONE_IDS, type ZoneId } from './world';
 
 export interface PartyMember {
   id: number;
@@ -38,14 +39,18 @@ export interface TrainerState {
   pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
   stats: { correct: number; wrong: number; caught: number; encounters: number };
   inventory: { pokeball: number; berry: number; cut: number; rod: number; coin: number; lumber: number; stone: number; seed: number };
+  // Tile-scoped maps. Keys are namespaced as `${zoneId}:${x},${y}` so the
+  // same coordinates in different zones don't collide.
   worldItems: Record<string, boolean>;
   cutTrees: Record<string, boolean>;
   defeatedTrainers: Record<string, boolean>;
   visitedCenter: number;
   starterChosen: boolean;
+  currentZone: ZoneId;
 }
 
-const KEY = 'pokapiya.save.v3';
+const KEY = 'pokapiya.save.v4';
+const LEGACY_KEY_V3 = 'pokapiya.save.v3';
 
 const empty = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
@@ -59,23 +64,47 @@ const empty = (): TrainerState => ({
   defeatedTrainers: {},
   visitedCenter: 0,
   starterChosen: false,
+  currentZone: 'town',
 });
+
+// Migration: rewrite legacy unprefixed `x,y` tile keys to `town:x,y`.
+function migrateTileKeys(rec: Record<string, boolean> | undefined): Record<string, boolean> {
+  if (!rec) return {};
+  const out: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(rec)) {
+    if (k.includes(':')) out[k] = v;
+    else out[`town:${k}`] = v;
+  }
+  return out;
+}
 
 export function load(): TrainerState {
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    let migratedFromV3 = false;
+    if (!raw) {
+      raw = localStorage.getItem(LEGACY_KEY_V3);
+      migratedFromV3 = !!raw;
+    }
     if (!raw) return empty();
     const parsed = JSON.parse(raw);
     const base = empty();
-    return {
+    const merged: TrainerState = {
       ...base,
       ...parsed,
       stats: { ...base.stats, ...(parsed.stats || {}) },
       inventory: { ...base.inventory, ...(parsed.inventory || {}) },
-      worldItems: parsed.worldItems || {},
-      cutTrees: parsed.cutTrees || {},
+      worldItems: migrateTileKeys(parsed.worldItems),
+      cutTrees: migrateTileKeys(parsed.cutTrees),
       defeatedTrainers: parsed.defeatedTrainers || {},
+      currentZone: ZONE_IDS.includes(parsed.currentZone) ? (parsed.currentZone as ZoneId) : 'town',
     };
+    if (migratedFromV3) {
+      // Persist the migrated state under the v4 key so we don't redo this.
+      save(merged);
+      try { localStorage.removeItem(LEGACY_KEY_V3); } catch {}
+    }
+    return merged;
   } catch {
     return empty();
   }
@@ -87,6 +116,7 @@ export function save(state: TrainerState) {
 
 export function reset(): TrainerState {
   localStorage.removeItem(KEY);
+  try { localStorage.removeItem(LEGACY_KEY_V3); } catch {}
   return empty();
 }
 
@@ -142,12 +172,8 @@ export function recordAnswer(state: TrainerState, correct: boolean) {
   save(state);
 }
 
-// Re-imported here to avoid a circular import via evolution.ts → save.ts.
-// Callers should invoke `checkEvolutions` from game/evolution.ts after a
-// batch of correct answers or after a catch.
-
-export function takeItem(state: TrainerState, x: number, y: number, type: string): boolean {
-  const key = `${x},${y}`;
+export function takeItem(state: TrainerState, zoneId: ZoneId, x: number, y: number, type: string): boolean {
+  const key = `${zoneId}:${x},${y}`;
   if (state.worldItems[key]) return false;
   state.worldItems[key] = true;
   const inv = state.inventory as Record<string, number>;
@@ -178,8 +204,13 @@ export function healAtCenter(state: TrainerState) {
   save(state);
 }
 
-export function cutTree(state: TrainerState, x: number, y: number) {
-  state.cutTrees[`${x},${y}`] = true;
+export function cutTree(state: TrainerState, zoneId: ZoneId, x: number, y: number) {
+  state.cutTrees[`${zoneId}:${x},${y}`] = true;
+  save(state);
+}
+
+export function setZone(state: TrainerState, zoneId: ZoneId) {
+  state.currentZone = zoneId;
   save(state);
 }
 
@@ -203,38 +234,38 @@ export function spendCoins(state: TrainerState, n: number): boolean {
 export function craft(state: TrainerState, recipeId: string): boolean {
   const inv = state.inventory;
   switch (recipeId) {
-    case 'fence': // 2 lumber → +1 fence (decorative — counted in coin for now)
+    case 'fence':
       if (inv.lumber < 2) return false;
       inv.lumber -= 2;
-      inv.coin += 3; // crafted item rewards 3 coins for now
+      inv.coin += 3;
       save(state);
       return true;
-    case 'path': // 2 stone → +1 path tile
+    case 'path':
       if (inv.stone < 2) return false;
       inv.stone -= 2;
       inv.coin += 3;
       save(state);
       return true;
-    case 'berry-tree': // 1 seed + 1 lumber → +1 berry tree
+    case 'berry-tree':
       if (inv.seed < 1 || inv.lumber < 1) return false;
       inv.seed -= 1;
       inv.lumber -= 1;
-      inv.berry += 2; // tree immediately ripens (simplified)
+      inv.berry += 2;
       save(state);
       return true;
-    case 'sell-berry': // 1 berry → 5 coins
+    case 'sell-berry':
       if (inv.berry < 1) return false;
       inv.berry -= 1;
       inv.coin += 5;
       save(state);
       return true;
-    case 'buy-pokeball': // 8 coins → 1 pokeball
+    case 'buy-pokeball':
       if (inv.coin < 8) return false;
       inv.coin -= 8;
       inv.pokeball += 1;
       save(state);
       return true;
-    case 'buy-berry': // 5 coins → 1 berry
+    case 'buy-berry':
       if (inv.coin < 5) return false;
       inv.coin -= 5;
       inv.berry += 1;
