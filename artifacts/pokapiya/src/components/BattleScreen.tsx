@@ -716,8 +716,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         @keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
         @keyframes idleBob {
-          0%,100% { transform: translateY(0) scale(1); }
-          50%     { transform: translateY(-8px) scale(1.02); }
+          0%,100% { transform: scale(1, 1); }
+          50%     { transform: scale(1.012, 0.985); }
         }
         @keyframes lungePlayer {
           0%   { transform: translate(0,0) scale(1); }
