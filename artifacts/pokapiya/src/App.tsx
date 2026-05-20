@@ -8,13 +8,17 @@ import PCModal from './components/PCModal';
 import StarterModal from './components/StarterModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
-import { load, save, defeatTrainer, type TrainerState } from './game/save';
+import { load, save, defeatTrainer, earnCoins, type TrainerState } from './game/save';
 import { checkEvolutions } from './game/evolution';
 import QuestModal from './components/QuestModal';
+import MovesModal from './components/MovesModal';
+import CraftModal from './components/CraftModal';
 import type { Pokemon } from './data/pokedex';
 import type { NPCTrainer } from './game/world';
 
-type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak' | 'quests';
+type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak' | 'quests' | 'moves' | 'craft';
+
+const TRAINER_COIN_REWARD = 12;
 
 const REWARD_LABELS: Record<string, string> = {
   cut: '✂️ Cut HM',
@@ -64,8 +68,10 @@ export default function App() {
       if (reward === 'rod') inv.rod = 1;
       if (reward === 'pokeballs') inv.pokeball = (inv.pokeball || 0) + 5;
       if (reward === 'berries') inv.berry = (inv.berry || 0) + 3;
+      // Every trainer also drops Pokapiya coins — currency for the Workshop.
+      earnCoins(stateRef.current, TRAINER_COIN_REWARD);
       save(stateRef.current);
-      showToast(`🏆 You beat ${currentTrainer.name}! Got ${REWARD_LABELS[reward]}!`);
+      showToast(`🏆 You beat ${currentTrainer.name}! Got ${REWARD_LABELS[reward]} + 🪙${TRAINER_COIN_REWARD}!`);
     } else if (caught && wildPokemon) {
       showToast(`✨ ${wildPokemon.name} joined your team!`);
     }
@@ -107,8 +113,11 @@ export default function App() {
         if (k === 't') setScreen('team');
         if (k === 'p') setScreen('pokedex');
         if (k === 'q') setScreen('quests');
+        if (k === 'm') setScreen('moves');
+        if (k === 'c') setScreen('craft');
       } else if (k === 'escape') {
-        if (screen === 'team' || screen === 'pokedex' || screen === 'pc' || screen === 'quests') setScreen('world');
+        if (screen === 'team' || screen === 'pokedex' || screen === 'pc' ||
+            screen === 'quests' || screen === 'moves' || screen === 'craft') setScreen('world');
       }
     };
     window.addEventListener('keydown', handler);
@@ -138,6 +147,8 @@ export default function App() {
           onTeam={() => setScreen('team')}
           onPokedex={() => setScreen('pokedex')}
           onQuests={() => setScreen('quests')}
+          onMoves={() => setScreen('moves')}
+          onCraft={() => setScreen('craft')}
           onSave={() => {
             save(trainerState);
             showToast('💾 Game saved!');
@@ -183,6 +194,14 @@ export default function App() {
 
       {screen === 'quests' && (
         <QuestModal state={trainerState} onClose={() => setScreen('world')} />
+      )}
+
+      {screen === 'moves' && (
+        <MovesModal state={trainerState} onClose={() => setScreen('world')} />
+      )}
+
+      {screen === 'craft' && (
+        <CraftModal state={trainerState} onChange={handleStateChange} onClose={() => setScreen('world')} />
       )}
 
       {screen === 'pc' && (
