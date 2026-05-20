@@ -671,9 +671,12 @@ function drawItem(ctx: CanvasRenderingContext2D, gs: GameState, type: string, sx
 }
 
 function drawAmbientMon(ctx: CanvasRenderingContext2D, a: AmbientMon, sx: number, sy: number) {
+  // Shadow sits at the tile's foot anchor; sprite bottom lines up with the shadow
+  // (previously the sprite's feet floated 4px above the shadow).
+  const footY = sy + 14;
   ctx.fillStyle = 'rgba(0,0,0,0.25)';
-  ctx.beginPath(); ctx.ellipse(sx, sy + 14, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
-  if (a.img) ctx.drawImage(a.img, sx - 20, sy - 30, 40, 40);
+  ctx.beginPath(); ctx.ellipse(sx, footY, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+  if (a.img) ctx.drawImage(a.img, sx - 20, footY - 40, 40, 40);
 }
 
 // ─── PIXEL-ART PLAYER ────────────────────────────────────────────────────────
