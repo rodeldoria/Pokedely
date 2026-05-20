@@ -17,7 +17,8 @@ export interface FieldMove {
 }
 
 function hasType(state: TrainerState, type: string): boolean {
-  return state.team.some(m => m.types.includes(type));
+  return state.team.some(m => m.types.includes(type)) ||
+         state.box.some(m => m.types.includes(type));
 }
 
 export const FIELD_MOVES: FieldMove[] = [
