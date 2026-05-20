@@ -78,6 +78,28 @@ function migrateTileKeys(rec: Record<string, boolean> | undefined): Record<strin
   return out;
 }
 
+// Eeveelution → Eevee revert. One-time migration: Addie's Eevee evolved on
+// the old auto-evolution path; she wants control over when (and whether) it
+// evolves. We rewrite any Eeveelution in her team back to a base Eevee with
+// the same nickname and reset its evolution-progress baseline so the
+// EvolutionModal will prompt her again at the right time.
+const EEVEELUTION_IDS = new Set([134, 135, 136, 196, 197, 470, 471, 700]);
+const EEVEE_REVERT_FLAG = 'pokapiya:eeveeReverted';
+
+function revertEeveelutions(state: TrainerState): boolean {
+  let changed = false;
+  for (const m of state.team) {
+    if (EEVEELUTION_IDS.has(m.id)) {
+      m.id = 133;
+      m.name = 'Eevee';
+      m.types = ['normal'];
+      m.correctAtCatch = state.stats.correct;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export function load(): TrainerState {
   try {
     let raw = localStorage.getItem(KEY);
@@ -99,8 +121,14 @@ export function load(): TrainerState {
       defeatedTrainers: parsed.defeatedTrainers || {},
       currentZone: ZONE_IDS.includes(parsed.currentZone) ? (parsed.currentZone as ZoneId) : 'town',
     };
-    if (migratedFromV3) {
-      // Persist the migrated state under the v4 key so we don't redo this.
+
+    let needsResave = migratedFromV3;
+    if (!localStorage.getItem(EEVEE_REVERT_FLAG)) {
+      if (revertEeveelutions(merged)) needsResave = true;
+      try { localStorage.setItem(EEVEE_REVERT_FLAG, '1'); } catch {}
+    }
+
+    if (needsResave) {
       save(merged);
       try { localStorage.removeItem(LEGACY_KEY_V3); } catch {}
     }

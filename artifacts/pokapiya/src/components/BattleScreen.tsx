@@ -46,14 +46,43 @@ const TYPE_MOVE: Record<string, Move> = {
   poison:   { name: 'Poison Sting', type: 'poison', power: 13, emoji: '☠️' },
   steel:    { name: 'Metal Claw', type: 'steel',    power: 15, emoji: '⚙️' },
   dragon:   { name: 'Dragon Breath', type: 'dragon',power: 17, emoji: '🐉' },
-  normal:   { name: 'Quick Attack', type: 'normal', power: 13, emoji: '💨' },
+  normal:   { name: 'Body Slam',  type: 'normal',   power: 15, emoji: '💢' },
 };
 
+// Second flavor move per type so single-type Pokémon still get a full 4-move
+// set with some variety instead of two identical-feeling slots.
+const TYPE_MOVE_2: Record<string, Move> = {
+  grass:    { name: 'Razor Leaf',  type: 'grass',   power: 18, emoji: '🍃' },
+  fire:     { name: 'Flame Wheel', type: 'fire',    power: 18, emoji: '🔥' },
+  water:    { name: 'Bubble Beam', type: 'water',   power: 17, emoji: '🫧' },
+  electric: { name: 'Thunder Shock', type: 'electric', power: 14, emoji: '⚡' },
+  bug:      { name: 'String Shot', type: 'bug',     power: 10, emoji: '🕸️' },
+  psychic:  { name: 'Psybeam',     type: 'psychic', power: 18, emoji: '🌀' },
+  fairy:    { name: 'Draining Kiss', type: 'fairy', power: 14, emoji: '💖' },
+  dark:     { name: 'Pursuit',     type: 'dark',    power: 14, emoji: '🌒' },
+  ice:      { name: 'Powder Snow', type: 'ice',     power: 13, emoji: '🌨️' },
+  fighting: { name: 'Low Kick',    type: 'fighting',power: 14, emoji: '🦵' },
+  rock:     { name: 'Rollout',     type: 'rock',    power: 13, emoji: '⛰️' },
+  ground:   { name: 'Sand Attack', type: 'ground',  power: 10, emoji: '🏖️' },
+  flying:   { name: 'Wing Attack', type: 'flying',  power: 16, emoji: '🪽' },
+  ghost:    { name: 'Lick',        type: 'ghost',   power: 12, emoji: '👅' },
+  poison:   { name: 'Acid',        type: 'poison',  power: 15, emoji: '🧪' },
+  steel:    { name: 'Iron Head',   type: 'steel',   power: 18, emoji: '🛡️' },
+  dragon:   { name: 'Twister',     type: 'dragon',  power: 14, emoji: '🌪️' },
+  normal:   { name: 'Double Slap', type: 'normal',  power: 12, emoji: '✋' },
+};
+
+const TACKLE: Move = { name: 'Tackle',       type: 'normal', power: 12, emoji: '💥' };
+const QUICK:  Move = { name: 'Quick Attack', type: 'normal', power: 13, emoji: '💨' };
+
 function getMoves(types: string[]): Move[] {
-  const tackle: Move = { name: 'Tackle', type: 'normal', power: 12, emoji: '💥' };
-  const t = types[0] || 'normal';
-  const special = TYPE_MOVE[t] || TYPE_MOVE.normal;
-  return [tackle, special];
+  const t1 = types[0] || 'normal';
+  const t2 = types[1];
+  const m1 = TYPE_MOVE[t1] || TYPE_MOVE.normal;
+  const m2 = t2
+    ? (TYPE_MOVE[t2] || TYPE_MOVE_2[t1] || TYPE_MOVE_2.normal)
+    : (TYPE_MOVE_2[t1] || TYPE_MOVE_2.normal);
+  return [TACKLE, m1, m2, QUICK];
 }
 
 // Simple effectiveness (kid-friendly subset)
@@ -197,7 +226,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     const lead0 = state.team[0];
     if (!lead0) return;
     setPhase('enemyTurn');
-    const wildMove = getMoves(wild.types)[Math.random() < 0.5 ? 0 : 1];
+    const wildMoves = getMoves(wild.types);
+    const wildMove = wildMoves[Math.floor(Math.random() * wildMoves.length)];
     setLog(`Wild ${displayName(wild)} used ${wildMove.name}! ${wildMove.emoji}`);
     setFeedback('');
     setAttacker('wild');
