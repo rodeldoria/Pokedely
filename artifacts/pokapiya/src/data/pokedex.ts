@@ -81,7 +81,26 @@ const KANTO: [number, string, string[], number][] = [
   [132,'Ditto',['normal'],3],
   [133,'Eevee',['normal'],2],
   [134,'Vaporeon',['water'],3],[135,'Jolteon',['electric'],3],[136,'Flareon',['fire'],3],
+  [196,'Espeon',['psychic'],3],[197,'Umbreon',['dark'],3],
+  [470,'Leafeon',['grass'],3],[471,'Glaceon',['ice'],3],[700,'Sylveon',['fairy'],3],
 ];
+
+export function pickByType(...wantedTypes: string[]): Pokemon {
+  const matches = KANTO.filter(p => p[2].some(t => wantedTypes.includes(t)));
+  if (matches.length === 0) return pickRandom();
+  const weights = matches.map(p => ({ tier: p[3], row: p }));
+  const totalWeight = weights.reduce((s, w) => s + (w.tier === 1 ? 4 : w.tier === 2 ? 2 : 1), 0);
+  let r = Math.random() * totalWeight;
+  for (const w of weights) {
+    r -= (w.tier === 1 ? 4 : w.tier === 2 ? 2 : 1);
+    if (r <= 0) {
+      const [id, name, types, rarity] = w.row;
+      return { id, name, types, rarity };
+    }
+  }
+  const [id, name, types, rarity] = matches[0];
+  return { id, name, types, rarity };
+}
 
 export function byId(id: number): Pokemon | null {
   const row = KANTO.find(p => p[0] === id);

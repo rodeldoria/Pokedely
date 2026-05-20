@@ -14,6 +14,18 @@ export type TileCode = typeof TILE[keyof typeof TILE];
 const SOLID = new Set<TileCode>([TILE.TREE, TILE.WATER, TILE.ROCK]);
 export const isSolid = (code: TileCode | undefined) => code !== undefined && SOLID.has(code);
 export const isTallGrass = (code: TileCode | undefined) => code === TILE.TALLGRASS;
+export const isWater = (code: TileCode | undefined) => code === TILE.WATER;
+export const isTree = (code: TileCode | undefined) => code === TILE.TREE;
+
+export interface NPCTrainer {
+  id: string;
+  name: string;
+  kind: 'hiker' | 'fisher' | 'camper' | 'bug' | 'lass';
+  tx: number; ty: number;
+  pokemonId: number;
+  greet: string;
+  reward: 'cut' | 'rod' | 'pokeballs' | 'berries';
+}
 
 export interface MapFeatures {
   spawn: { x: number; y: number };
@@ -21,6 +33,7 @@ export interface MapFeatures {
   door: { x: number; y: number };
   items: Array<{ x: number; y: number; type: string }>;
   signs: Array<{ x: number; y: number; text: string }>;
+  trainers: NPCTrainer[];
 }
 
 export interface WorldMap {
@@ -95,6 +108,16 @@ export function generateMap(width = 48, height = 36, seed = 7): WorldMap {
     if (map[y][x] === TILE.GRASS && !nearPath(map, x, y, 2)) map[y][x] = TILE.TREE;
   }
 
+  // Add some "cuttable trees" placed deliberately to block shortcuts
+  // (just regular trees but in key locations)
+  const cuttable = [
+    [midX - 2, midY - 8], [midX + 2, midY + 8],
+    [10, midY], [width - 12, midY], [midX, 6], [midX, height - 6],
+  ];
+  for (const [x, y] of cuttable) {
+    if (map[y]?.[x] !== undefined) map[y][x] = TILE.TREE;
+  }
+
   const pcX = midX - 1, pcY = midY - 5;
   for (let dy = -2; dy <= 2; dy++)
     for (let dx = -2; dx <= 2; dx++) {
@@ -112,14 +135,47 @@ export function generateMap(width = 48, height = 36, seed = 7): WorldMap {
     { x: width - 10, y: 3, type: 'pokeball' },
     { x: 6, y: height - 5, type: 'berry' },
     { x: midX + 8, y: midY + 8, type: 'pokeball' },
+    { x: 18, y: 6, type: 'pokeball' },
+    { x: 32, y: 28, type: 'berry' },
   ];
   const signs = [
     { x: midX - 3, y: midY + 1, text: 'BEACH →' },
     { x: midX + 2, y: midY - 1, text: '↑ MOUNTAIN' },
     { x: midX - 1, y: midY + 5, text: '↓ FLOWERS' },
   ];
+  const trainers: NPCTrainer[] = [
+    { id: 'hiker_joe',  name: 'Hiker Joe',  kind: 'hiker',  tx: width - 8, ty: 4,  pokemonId: 74,  greet: "Yo! Battle me, lil' trainer!", reward: 'cut' },
+    { id: 'fisher_mac', name: 'Fisher Mac', kind: 'fisher', tx: 8,         ty: 30, pokemonId: 60,  greet: "Reel one in! Wanna battle?", reward: 'rod' },
+    { id: 'camper_sue', name: 'Camper Sue', kind: 'camper', tx: 38,        ty: 22, pokemonId: 25,  greet: "My Pikachu is super strong!", reward: 'pokeballs' },
+    { id: 'lass_lily',  name: 'Lass Lily',  kind: 'lass',   tx: 20,        ty: 14, pokemonId: 35,  greet: "Hi! Let's have a fairy battle!", reward: 'berries' },
+  ];
 
-  return { map, width, height, features: { spawn, pokeCenter: { x: pcX, y: pcY }, door: { x: doorX, y: doorY }, items, signs } };
+  return {
+    map, width, height,
+    features: { spawn, pokeCenter: { x: pcX, y: pcY }, door: { x: doorX, y: doorY }, items, signs, trainers },
+  };
+}
+
+// Check if the player is adjacent to a water tile (for fishing)
+export function adjacentToWater(map: TileCode[][], px: number, py: number): { x: number; y: number } | null {
+  const checks = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,1],[1,-1],[-1,-1]];
+  const x = Math.floor(px), y = Math.floor(py);
+  for (const [dx, dy] of checks) {
+    const nx = x + dx, ny = y + dy;
+    if (map[ny]?.[nx] === TILE.WATER) return { x: nx, y: ny };
+  }
+  return null;
+}
+
+// Check if the player is adjacent to a tree (for cut)
+export function adjacentToTree(map: TileCode[][], px: number, py: number, cutTrees: Record<string, boolean>): { x: number; y: number } | null {
+  const checks = [[0,-1],[0,1],[-1,0],[1,0]];
+  const x = Math.floor(px), y = Math.floor(py);
+  for (const [dx, dy] of checks) {
+    const nx = x + dx, ny = y + dy;
+    if (map[ny]?.[nx] === TILE.TREE && !cutTrees[`${nx},${ny}`]) return { x: nx, y: ny };
+  }
+  return null;
 }
 
 function splat(map: TileCode[][], x: number, y: number, w: number, h: number, code: TileCode, rng: () => number) {

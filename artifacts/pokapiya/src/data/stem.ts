@@ -27,39 +27,66 @@ function shuffleChoices(q: Question): Question {
   return { ...q, choices: indexed.map(p => p.c), answerIndex: correctNew };
 }
 
+// Categories sorted by approximate difficulty for a 6-year-old
+const EASY = ['colors', 'shapes', 'counting', 'animals', 'opposites', 'addie'];
+const MEDIUM = ['spelling', 'alphabet', 'rhymes', 'patterns', 'categorize', 'science'];
+const HARD = ['math', 'subtraction', 'reading'];
+
 const TYPE_TO_CATEGORY: Record<string, string[]> = {
-  grass: ['animals', 'science', 'spelling', 'addie'],
-  bug:   ['animals', 'spelling', 'counting'],
-  water: ['animals', 'science', 'categorize'],
-  fire:  ['colors',  'science', 'opposites'],
-  electric: ['science', 'patterns', 'math', 'addie'],
-  ice:    ['science', 'opposites', 'colors'],
-  steel:  ['shapes',  'patterns', 'math'],
-  rock:   ['shapes',  'science', 'categorize'],
-  ground: ['science', 'shapes',  'counting'],
-  flying: ['animals', 'patterns','reading'],
-  fighting: ['math',  'subtraction', 'opposites'],
-  poison: ['categorize', 'opposites', 'colors'],
-  psychic: ['patterns', 'alphabet', 'reading'],
-  ghost:  ['rhymes',   'alphabet',   'patterns'],
-  dragon: ['math',     'subtraction','reading'],
-  fairy:  ['rhymes',   'spelling',   'colors', 'addie'],
-  normal: ['spelling', 'counting',   'animals', 'addie'],
-  dark:   ['opposites','rhymes',     'alphabet'],
+  grass: ['animals','science','spelling','addie'],
+  bug: ['animals','spelling','counting'],
+  water: ['animals','science','categorize'],
+  fire: ['colors','science','opposites'],
+  electric: ['science','patterns','math','addie'],
+  ice: ['science','opposites','colors'],
+  steel: ['shapes','patterns','math'],
+  rock: ['shapes','science','categorize'],
+  ground: ['science','shapes','counting'],
+  flying: ['animals','patterns','reading'],
+  fighting: ['math','subtraction','opposites'],
+  poison: ['categorize','opposites','colors'],
+  psychic: ['patterns','alphabet','reading'],
+  ghost: ['rhymes','alphabet','patterns'],
+  dragon: ['math','subtraction','reading'],
+  fairy: ['rhymes','spelling','colors','addie'],
+  normal: ['spelling','counting','animals','addie'],
+  dark: ['opposites','rhymes','alphabet'],
 };
 
 const ALL_CATEGORIES = Object.keys(typedBank.categories);
 
-export function questionFor(pokemon: Pokemon, difficultyBoost = 0): Question {
+// level: 1 (easiest, age 5-6) up to 20 (hardest)
+// At low levels, only easy categories. As level rises, medium and hard categories unlock.
+export function questionFor(pokemon: Pokemon, level = 1): Question {
   const primary = pokemon?.types?.[0] || 'normal';
-  const tier = (pokemon?.rarity || 1) + difficultyBoost;
-  const candidates = TYPE_TO_CATEGORY[primary] || ['spelling', 'counting', 'math'];
-  let categoryKey: string;
-  if (tier >= 3 && Math.random() < 0.35) {
-    categoryKey = pickOne(['reading', 'math', 'subtraction', 'alphabet']);
+  let typed = TYPE_TO_CATEGORY[primary] || ['spelling','counting','math'];
+
+  // Filter by difficulty unlocked at this level
+  let allowedDifficulty: string[];
+  if (level <= 3) allowedDifficulty = EASY;
+  else if (level <= 8) allowedDifficulty = [...EASY, ...MEDIUM];
+  else allowedDifficulty = [...EASY, ...MEDIUM, ...HARD];
+
+  // 60% chance use a type-matched category that's also in allowed; else any allowed
+  const typedAllowed = typed.filter(c => allowedDifficulty.includes(c));
+  let pool: string[];
+  if (typedAllowed.length > 0 && Math.random() < 0.6) {
+    pool = typedAllowed;
   } else {
-    categoryKey = pickOne(candidates);
+    pool = allowedDifficulty;
   }
+
+  // For mid/hard levels, bias toward harder categories
+  if (level >= 6) {
+    const harder = pool.filter(c => MEDIUM.includes(c) || HARD.includes(c));
+    if (harder.length && Math.random() < 0.5) pool = harder;
+  }
+  if (level >= 12) {
+    const hardest = pool.filter(c => HARD.includes(c));
+    if (hardest.length && Math.random() < 0.4) pool = hardest;
+  }
+
+  let categoryKey = pickOne(pool);
   if (!typedBank.categories[categoryKey] || typedBank.categories[categoryKey].length === 0) {
     categoryKey = pickOne(ALL_CATEGORIES);
   }

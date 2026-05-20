@@ -1,17 +1,27 @@
 import type { Pokemon } from '../data/pokedex';
 
-export interface TrainerState {
-  trainer: { name: string; steps: number };
-  team: Array<{ id: number; name: string; types: string[]; caughtAt: number }>;
-  box: Array<{ id: number; name: string; types: string[]; caughtAt: number }>;
-  pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
-  stats: { correct: number; wrong: number; caught: number; encounters: number };
-  inventory: { pokeball: number; berry: number };
-  worldItems: Record<string, boolean>;
-  visitedCenter: number;
+export interface PartyMember {
+  id: number;
+  name: string;
+  types: string[];
+  caughtAt: number;
 }
 
-const KEY = 'pokapiya.save.v2';
+export interface TrainerState {
+  trainer: { name: string; steps: number };
+  team: PartyMember[];
+  box: PartyMember[];
+  pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
+  stats: { correct: number; wrong: number; caught: number; encounters: number };
+  inventory: { pokeball: number; berry: number; cut: number; rod: number };
+  worldItems: Record<string, boolean>;
+  cutTrees: Record<string, boolean>;
+  defeatedTrainers: Record<string, boolean>;
+  visitedCenter: number;
+  starterChosen: boolean;
+}
+
+const KEY = 'pokapiya.save.v3';
 
 const empty = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
@@ -19,9 +29,12 @@ const empty = (): TrainerState => ({
   box: [],
   pokedex: {},
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
-  inventory: { pokeball: 5, berry: 0 },
+  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0 },
   worldItems: {},
+  cutTrees: {},
+  defeatedTrainers: {},
   visitedCenter: 0,
+  starterChosen: false,
 });
 
 export function load(): TrainerState {
@@ -29,12 +42,15 @@ export function load(): TrainerState {
     const raw = localStorage.getItem(KEY);
     if (!raw) return empty();
     const parsed = JSON.parse(raw);
+    const base = empty();
     return {
-      ...empty(),
+      ...base,
       ...parsed,
-      stats: { ...empty().stats, ...(parsed.stats || {}) },
-      inventory: { ...empty().inventory, ...(parsed.inventory || {}) },
+      stats: { ...base.stats, ...(parsed.stats || {}) },
+      inventory: { ...base.inventory, ...(parsed.inventory || {}) },
       worldItems: parsed.worldItems || {},
+      cutTrees: parsed.cutTrees || {},
+      defeatedTrainers: parsed.defeatedTrainers || {},
     };
   } catch {
     return empty();
@@ -50,6 +66,17 @@ export function reset(): TrainerState {
   return empty();
 }
 
+// Level = 1 + floor(correct/8). Capped at 20. Determines question difficulty.
+export function getLevel(state: TrainerState): number {
+  return Math.min(20, 1 + Math.floor(state.stats.correct / 8));
+}
+
+export function xpToNextLevel(state: TrainerState): { have: number; need: number } {
+  const lvl = getLevel(state);
+  const nextThreshold = lvl * 8;
+  return { have: state.stats.correct, need: nextThreshold };
+}
+
 export function recordEncounter(state: TrainerState, pokemon: Pokemon) {
   state.stats.encounters += 1;
   const entry = state.pokedex[pokemon.id] || { seen: false, caught: false, count: 0 };
@@ -61,10 +88,11 @@ export function recordEncounter(state: TrainerState, pokemon: Pokemon) {
 export function recordCatch(state: TrainerState, pokemon: Pokemon) {
   state.stats.caught += 1;
   const entry = state.pokedex[pokemon.id] || { seen: true, caught: false, count: 0 };
+  entry.seen = true;
   entry.caught = true;
   entry.count = (entry.count || 0) + 1;
   state.pokedex[pokemon.id] = entry;
-  const member = { id: pokemon.id, name: pokemon.name, types: pokemon.types, caughtAt: Date.now() };
+  const member: PartyMember = { id: pokemon.id, name: pokemon.name, types: pokemon.types, caughtAt: Date.now() };
   if (state.team.length < 6) state.team.push(member);
   else state.box.push(member);
   save(state);
@@ -79,7 +107,8 @@ export function takeItem(state: TrainerState, x: number, y: number, type: string
   const key = `${x},${y}`;
   if (state.worldItems[key]) return false;
   state.worldItems[key] = true;
-  (state.inventory as Record<string, number>)[type] = ((state.inventory as Record<string, number>)[type] || 0) + 1;
+  const inv = state.inventory as Record<string, number>;
+  inv[type] = (inv[type] || 0) + 1;
   save(state);
   return true;
 }
@@ -102,5 +131,15 @@ export function healAtCenter(state: TrainerState) {
   state.visitedCenter += 1;
   state.inventory.pokeball += 3;
   state.inventory.berry += 1;
+  save(state);
+}
+
+export function cutTree(state: TrainerState, x: number, y: number) {
+  state.cutTrees[`${x},${y}`] = true;
+  save(state);
+}
+
+export function defeatTrainer(state: TrainerState, id: string) {
+  state.defeatedTrainers[id] = true;
   save(state);
 }

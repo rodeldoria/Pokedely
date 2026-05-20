@@ -3,27 +3,46 @@ import GameCanvas from './components/GameCanvas';
 import BattleScreen from './components/BattleScreen';
 import TeamModal from './components/TeamModal';
 import PokeCenterModal from './components/PokeCenterModal';
+import PokedexModal from './components/PokedexModal';
+import PCModal from './components/PCModal';
+import StarterModal from './components/StarterModal';
 import HUD from './components/HUD';
-import { load, save, type TrainerState } from './game/save';
+import { load, save, defeatTrainer, type TrainerState } from './game/save';
 import type { Pokemon } from './data/pokedex';
+import type { NPCTrainer } from './game/world';
 
-type Screen = 'world' | 'battle' | 'team' | 'pokecenter';
+type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter';
+
+const REWARD_LABELS: Record<string, string> = {
+  cut: '✂️ Cut HM',
+  rod: '🎣 Fishing Rod',
+  pokeballs: '5× Poké Balls',
+  berries: '3× Berries',
+};
 
 export default function App() {
   const stateRef = useRef<TrainerState>(load());
   const [, forceUpdate] = useState(0);
-  const [screen, setScreen] = useState<Screen>('world');
+  const [screen, setScreen] = useState<Screen>(stateRef.current.starterChosen ? 'world' : 'starter');
   const [wildPokemon, setWildPokemon] = useState<Pokemon | null>(null);
+  const [currentTrainer, setCurrentTrainer] = useState<NPCTrainer | null>(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(''), 2000);
+    toastTimer.current = setTimeout(() => setToast(''), 2400);
   }, []);
 
   const handleEncounter = useCallback((wild: Pokemon) => {
+    setCurrentTrainer(null);
+    setWildPokemon(wild);
+    setScreen('battle');
+  }, []);
+
+  const handleTrainerEncounter = useCallback((wild: Pokemon, trainer: NPCTrainer) => {
+    setCurrentTrainer(trainer);
     setWildPokemon(wild);
     setScreen('battle');
   }, []);
@@ -33,13 +52,28 @@ export default function App() {
   }, [screen]);
 
   const handleBattleExit = useCallback((caught: boolean) => {
-    if (caught) showToast(`✨ ${wildPokemon ? wildPokemon.name : 'Pokémon'} joined your team!`);
+    if (caught && currentTrainer) {
+      defeatTrainer(stateRef.current, currentTrainer.id);
+      const reward = currentTrainer.reward;
+      const inv = stateRef.current.inventory as Record<string, number>;
+      if (reward === 'cut') inv.cut = 1;
+      if (reward === 'rod') inv.rod = 1;
+      if (reward === 'pokeballs') inv.pokeball = (inv.pokeball || 0) + 5;
+      if (reward === 'berries') inv.berry = (inv.berry || 0) + 3;
+      save(stateRef.current);
+      showToast(`🏆 You beat ${currentTrainer.name}! Got ${REWARD_LABELS[reward]}!`);
+    } else if (caught && wildPokemon) {
+      showToast(`✨ ${wildPokemon.name} joined your team!`);
+    }
+    setCurrentTrainer(null);
     setScreen('world');
     forceUpdate(n => n + 1);
-  }, [wildPokemon, showToast]);
+  }, [wildPokemon, currentTrainer, showToast]);
 
-  const handleTeam = useCallback(() => {
-    setScreen(s => s === 'team' ? 'world' : 'team');
+  const handleStateChange = useCallback((newState: TrainerState) => {
+    stateRef.current = newState;
+    save(newState);
+    forceUpdate(n => n + 1);
   }, []);
 
   const handlePokecenterClose = useCallback(() => {
@@ -48,24 +82,20 @@ export default function App() {
     forceUpdate(n => n + 1);
   }, [showToast]);
 
-  const handleStateChange = useCallback((newState: TrainerState) => {
-    stateRef.current = newState;
-    save(newState);
-    forceUpdate(n => n + 1);
-  }, []);
-
-  // T key opens team
+  // Global keys
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'T' || e.key === 't') {
-        if (screen === 'world') handleTeam();
-        else if (screen === 'team') setScreen('world');
+      const k = e.key.toLowerCase();
+      if (screen === 'world') {
+        if (k === 't') setScreen('team');
+        if (k === 'p') setScreen('pokedex');
+      } else if (k === 'escape') {
+        if (screen === 'team' || screen === 'pokedex' || screen === 'pc') setScreen('world');
       }
-      if (e.key === 'Escape' && screen === 'team') setScreen('world');
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [screen, handleTeam]);
+  }, [screen]);
 
   const trainerState = stateRef.current;
 
@@ -74,41 +104,65 @@ export default function App() {
       width: '100vw', height: '100vh', overflow: 'hidden',
       background: '#1a1005', display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
-      {/* The canvas game always renders (but freezes input when not active) */}
       <GameCanvas
         active={screen === 'world'}
         onEncounter={handleEncounter}
+        onTrainerEncounter={handleTrainerEncounter}
         onPokecenter={handlePokecenter}
         onToast={showToast}
         stateRef={stateRef}
       />
 
-      {/* HUD always visible when in world */}
       {screen === 'world' && (
-        <HUD state={trainerState} onTeam={handleTeam} toast={toast} />
+        <HUD
+          state={trainerState}
+          onTeam={() => setScreen('team')}
+          onPokedex={() => setScreen('pokedex')}
+          toast={toast}
+        />
       )}
 
-      {/* Battle overlay */}
+      {screen === 'starter' && (
+        <StarterModal
+          state={trainerState}
+          onPick={(s) => {
+            stateRef.current = s;
+            setScreen('world');
+            showToast('Welcome to your adventure! 🌟');
+            forceUpdate(n => n + 1);
+          }}
+        />
+      )}
+
       {screen === 'battle' && wildPokemon && (
         <BattleScreen
           wild={wildPokemon}
           state={trainerState}
           onStateChange={handleStateChange}
           onExit={handleBattleExit}
+          trainerName={currentTrainer?.name}
+          trainerReward={currentTrainer?.reward}
         />
       )}
 
-      {/* Team overlay */}
       {screen === 'team' && (
         <TeamModal state={trainerState} onClose={() => setScreen('world')} />
       )}
 
-      {/* Pokémon Center overlay */}
+      {screen === 'pokedex' && (
+        <PokedexModal state={trainerState} onClose={() => setScreen('world')} />
+      )}
+
+      {screen === 'pc' && (
+        <PCModal state={trainerState} onChange={handleStateChange} onClose={() => setScreen('pokecenter')} />
+      )}
+
       {screen === 'pokecenter' && (
         <PokeCenterModal
           state={trainerState}
           onChange={handleStateChange}
           onClose={handlePokecenterClose}
+          onPC={() => setScreen('pc')}
         />
       )}
     </div>

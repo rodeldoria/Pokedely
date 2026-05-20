@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { Pokemon } from '../data/pokedex';
 import { displayName, spriteUrl } from '../data/pokedex';
 import { questionFor } from '../data/stem';
-import { recordAnswer, recordCatch, useBall, useBerry } from '../game/save';
+import { recordAnswer, recordCatch, useBall, useBerry, getLevel } from '../game/save';
 import type { TrainerState } from '../game/save';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   state: TrainerState;
   onStateChange: (s: TrainerState) => void;
   onExit: (caught: boolean) => void;
+  trainerName?: string;       // if it's a trainer battle
+  trainerReward?: string;     // reward awarded on win
 }
 
 const TYPE_COLORS: Record<string, [string, string]> = {
@@ -23,9 +25,10 @@ const TYPE_COLORS: Record<string, [string, string]> = {
 
 type Phase = 'appear' | 'question' | 'throwing' | 'result';
 
-export default function BattleScreen({ wild, state, onStateChange, onExit }: Props) {
+export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward }: Props) {
+  const level = getLevel(state);
   const [phase, setPhase] = useState<Phase>('appear');
-  const [question, setQuestion] = useState(() => questionFor(wild));
+  const [question, setQuestion] = useState(() => questionFor(wild, level));
   const [attemptsLeft, setAttemptsLeft] = useState(5);
   const [berryBoost, setBerryBoost] = useState(0);
   const [feedback, setFeedback] = useState('');
@@ -42,9 +45,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
   }, []);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleFlee();
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleFlee(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [attemptsLeft]);
@@ -67,7 +68,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
         setTimeout(() => handleFlee(), 1500);
       } else {
         setTimeout(() => {
-          setQuestion(questionFor(wild));
+          setQuestion(questionFor(wild, level));
           setFeedback('');
           setPhase('question');
         }, 1800);
@@ -83,8 +84,11 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
       return;
     }
     onStateChange({ ...state });
-    const base = wild.rarity === 1 ? 0.88 : wild.rarity === 2 ? 0.72 : 0.55;
-    const didCatch = Math.random() < Math.min(0.97, base + berryBoost);
+    // Catch chance: scales DOWN with level (harder) and UP with berries
+    const base = wild.rarity === 1 ? 0.85 : wild.rarity === 2 ? 0.65 : 0.45;
+    const levelPenalty = Math.min(0.25, level * 0.015);
+    const chance = Math.max(0.2, Math.min(0.97, base - levelPenalty + berryBoost));
+    const didCatch = Math.random() < chance;
     setTimeout(() => {
       setShaking(false);
       if (didCatch) {
@@ -95,14 +99,14 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
         setPhase('result');
         setTimeout(() => onExit(true), 2200);
       } else {
-        setFeedback(`Oh no! ${displayName(wild)} broke free! ${attemptsLeft > 0 ? 'Try again!' : ''}`);
         const newAttempts = attemptsLeft - 1;
         setAttemptsLeft(newAttempts);
+        setFeedback(`Oh no! ${displayName(wild)} broke free! ${newAttempts > 0 ? 'Try again!' : ''}`);
         if (newAttempts <= 0 || state.inventory.pokeball <= 0) {
           setTimeout(() => handleFlee(), 1500);
         } else {
           setTimeout(() => {
-            setQuestion(questionFor(wild));
+            setQuestion(questionFor(wild, level));
             setFeedback('');
             setPhase('question');
           }, 1800);
@@ -137,17 +141,17 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
       display: 'flex', flexDirection: 'column',
       fontFamily: '"Segoe UI", sans-serif',
     }}>
-      {/* Top: banner */}
       <div style={{
         background: 'rgba(255,248,230,0.12)', borderBottom: '2px solid rgba(255,220,100,0.3)',
         padding: '10px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div>
           <div style={{ color: '#ffd54a', fontWeight: 'bold', fontSize: '22px' }}>
-            A wild {displayName(wild)} appeared!
+            {trainerName ? `${trainerName} sent out ${displayName(wild)}!` : `A wild ${displayName(wild)} appeared!`}
           </div>
           <div style={{ color: text, fontSize: '13px' }}>
-            {wild.types.map(t => t.toUpperCase()).join(' · ')} &nbsp;·&nbsp; Rarity {rarityStars}
+            {wild.types.map(t => t.toUpperCase()).join(' · ')} · Rarity {rarityStars}
+            &nbsp;·&nbsp; <span style={{ color: '#ffd54a' }}>Addie Lv. {level}</span>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -157,14 +161,12 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
         </div>
       </div>
 
-      {/* Middle: battle scene */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '20px 40px' }}>
-        {/* Trainer side */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
           <TrainerSprite />
-          <div style={{ color: '#ffd54a', fontSize: '13px', fontWeight: 'bold' }}>Addie</div>
+          <div style={{ color: '#ffd54a', fontSize: '13px', fontWeight: 'bold' }}>Addie · Lv. {level}</div>
           <div style={{ display: 'flex', gap: 4 }}>
-            {state.team.slice(0, 6).map((m, i) => (
+            {state.team.slice(0, 6).map((_, i) => (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: '50%',
                 background: '#4ade80', border: '1px solid #1a3a1a',
@@ -173,25 +175,19 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
           </div>
         </div>
 
-        {/* VS */}
         <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '48px', fontWeight: 'bold' }}>VS</div>
 
-        {/* Wild Pokemon */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div style={{
             width: 160, height: 160, position: 'relative',
             animation: shaking ? 'shake 0.15s infinite' : monVisible ? 'popIn 0.5s ease-out' : 'none',
           }}>
-            <img
-              src={spriteUrl(wild.id)}
-              alt={displayName(wild)}
-              style={{
-                width: '100%', height: '100%', imageRendering: 'pixelated',
-                filter: caught ? 'brightness(0) invert(0)' : 'drop-shadow(0 0 16px rgba(255,255,255,0.3))',
-                opacity: monVisible ? 1 : 0,
-                transition: 'opacity 0.3s',
-              }}
-            />
+            <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
+              width: '100%', height: '100%', imageRendering: 'pixelated',
+              filter: caught ? 'brightness(0)' : 'drop-shadow(0 0 16px rgba(255,255,255,0.3))',
+              opacity: monVisible ? 1 : 0,
+              transition: 'opacity 0.3s',
+            }} />
             {caught && (
               <div style={{
                 position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -205,12 +201,10 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
         </div>
       </div>
 
-      {/* Bottom: question area */}
       <div style={{
         background: 'rgba(20,14,4,0.92)', borderTop: '2px solid rgba(255,220,100,0.3)',
         padding: '16px 24px',
       }}>
-        {/* Feedback */}
         {feedback && (
           <div style={{
             textAlign: 'center', color: '#ffd54a', fontWeight: 'bold', fontSize: '16px',
@@ -223,15 +217,13 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
           <>
             <div style={{ textAlign: 'center', marginBottom: 8 }}>
               <span style={{ color: text, fontSize: '12px', fontWeight: 'bold' }}>
-                {question.subject} — answer to throw a Poké Ball! (Tries: {attemptsLeft})
+                {question.subject} · Lv. {level} question · (Tries: {attemptsLeft})
               </span>
             </div>
             <div style={{
               textAlign: 'center', color: '#fff8e1', fontSize: '20px', fontWeight: 'bold',
               marginBottom: 16, lineHeight: 1.4,
-            }}>
-              {question.prompt}
-            </div>
+            }}>{question.prompt}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 700, margin: '0 auto' }}>
               {question.choices.map((choice, i) => (
                 <button key={i} onClick={() => handleAnswer(i)} style={{
@@ -239,11 +231,10 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
                   border: `2px solid ${CHOICE_BORDERS[i % 4]}`,
                   borderRadius: 14, padding: '12px 20px',
                   fontWeight: 'bold', fontSize: '16px', color: '#1a0d00',
-                  cursor: 'pointer', transition: 'transform 0.1s, filter 0.1s',
+                  cursor: 'pointer', transition: 'filter 0.1s',
                 }}
                   onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-                  onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}
-                >
+                  onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}>
                   {choice}
                 </button>
               ))}
@@ -253,9 +244,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
                 background: '#f472b6', border: '2px solid #be185d',
                 borderRadius: 10, padding: '8px 20px',
                 fontWeight: 'bold', color: '#fff', cursor: 'pointer', fontSize: '14px',
-              }}>
-                🍓 Use a Berry (+catch chance)
-              </button>
+              }}>🍓 Use a Berry (+catch chance)</button>
             </div>
           </>
         )}
@@ -264,9 +253,6 @@ export default function BattleScreen({ wild, state, onStateChange, onExit }: Pro
           <div style={{ textAlign: 'center', color: '#ffd54a', fontSize: '20px', fontWeight: 'bold', padding: 20 }}>
             🔴 Poké Ball flying…
           </div>
-        )}
-        {phase === 'result' && (
-          <div style={{ textAlign: 'center', padding: 20 }} />
         )}
       </div>
 
@@ -299,34 +285,22 @@ function Chip({ icon, val, label }: { icon: string; val: number; label: string }
 function TrainerSprite() {
   return (
     <svg width="72" height="96" viewBox="0 0 36 48">
-      {/* Cap */}
       <rect x="10" y="0" width="16" height="5" fill="#d63946" rx="2"/>
       <rect x="8" y="4" width="20" height="3" fill="#d63946" rx="1"/>
-      {/* Brim */}
       <rect x="6" y="7" width="24" height="3" fill="#d63946"/>
-      {/* Hair */}
       <rect x="9" y="3" width="18" height="6" fill="#1a0d00"/>
-      {/* Face */}
       <rect x="11" y="9" width="14" height="12" fill="#f3c6a5" rx="2"/>
-      {/* Eyes */}
       <rect x="13" y="13" width="3" height="3" fill="#111" rx="1"/>
       <rect x="20" y="13" width="3" height="3" fill="#111" rx="1"/>
-      {/* Smile */}
       <path d="M14 20 Q18 23 22 20" stroke="#a0522d" strokeWidth="1.2" fill="none"/>
-      {/* Body */}
       <rect x="9" y="21" width="18" height="14" fill="#457b9d" rx="2"/>
-      {/* Belt */}
       <rect x="9" y="32" width="18" height="3" fill="#ffd54a"/>
-      {/* Arms */}
       <rect x="4" y="22" width="6" height="10" fill="#f3c6a5" rx="2"/>
       <rect x="26" y="22" width="6" height="10" fill="#f3c6a5" rx="2"/>
-      {/* Gloves */}
       <rect x="4" y="30" width="6" height="4" fill="#fff" rx="2"/>
       <rect x="26" y="30" width="6" height="4" fill="#fff" rx="2"/>
-      {/* Pants */}
       <rect x="10" y="35" width="7" height="11" fill="#1a1a3e" rx="1"/>
       <rect x="19" y="35" width="7" height="11" fill="#1a1a3e" rx="1"/>
-      {/* Shoes */}
       <rect x="9" y="44" width="9" height="4" fill="#111" rx="2"/>
       <rect x="18" y="44" width="9" height="4" fill="#111" rx="2"/>
     </svg>
