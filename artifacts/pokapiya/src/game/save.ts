@@ -87,15 +87,24 @@ export function reset(): TrainerState {
   return empty();
 }
 
-// Level = 1 + floor(correct/8). Capped at 20. Determines question difficulty.
+// XP per level (smaller = faster leveling for a 6 year old)
+const XP_PER_LEVEL = 4;
+
+// Level = 1 + floor(xp/XP_PER_LEVEL). Capped at 20.
 export function getLevel(state: TrainerState): number {
-  return Math.min(20, 1 + Math.floor(state.stats.correct / 8));
+  return Math.min(20, 1 + Math.floor(state.stats.correct / XP_PER_LEVEL));
 }
 
 export function xpToNextLevel(state: TrainerState): { have: number; need: number } {
   const lvl = getLevel(state);
-  const nextThreshold = lvl * 8;
+  const nextThreshold = lvl * XP_PER_LEVEL;
   return { have: state.stats.correct, need: nextThreshold };
+}
+
+// Grant XP (used for battle wins and catches, not just questions).
+export function grantXp(state: TrainerState, amount: number) {
+  state.stats.correct += amount;
+  save(state);
 }
 
 export function recordEncounter(state: TrainerState, pokemon: Pokemon) {

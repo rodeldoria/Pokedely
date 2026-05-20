@@ -5,7 +5,7 @@ import { questionFor } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import {
   recordAnswer, recordCatch, useBall, useBerry, getLevel,
-  ensureMemberHp, memberMaxHp, xpToNextLevel,
+  ensureMemberHp, memberMaxHp, xpToNextLevel, grantXp,
 } from '../game/save';
 import type { TrainerState, PartyMember } from '../game/save';
 
@@ -204,13 +204,20 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   }
 
   function onWildFaint() {
+    // Grant XP for the win: trainers worth more than wilds.
+    const lvlBefore = getLevel(state);
+    const xpGain = trainerName ? 3 : 1 + Math.max(0, wild.rarity - 1);
+    grantXp(state, xpGain);
+    const leveledUp = getLevel(state) > lvlBefore;
+    onStateChange({ ...state });
+    const lvlMsg = leveledUp ? ` ⭐ LEVEL UP! Now Lv.${getLevel(state)}!` : ` (+${xpGain} XP)`;
     if (trainerName) {
-      setFeedback(`🏆 You beat ${trainerName}!`);
+      setFeedback(`🏆 You beat ${trainerName}!${lvlMsg}`);
       setLog(`Wild ${displayName(wild)} fainted!`);
       setPhase('result');
       setTimeout(() => safeExit(false, true), 1800);
     } else {
-      setFeedback(`${displayName(wild)} fainted! It ran away before you could catch it.`);
+      setFeedback(`${displayName(wild)} fainted!${lvlMsg}`);
       setLog('');
       setPhase('result');
       setTimeout(() => safeExit(false, false), 1800);
