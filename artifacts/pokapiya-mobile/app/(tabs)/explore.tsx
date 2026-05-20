@@ -121,6 +121,16 @@ export default function ExploreScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         setActiveTrainer(null);
         setWild(opp);
+      } else if (tile === TILE.ROCK && Math.random() < 0.35) {
+        // Rocky mountains: chance of rock/ground types
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        setActiveTrainer(null);
+        setWild(pickByType('rock', 'ground'));
+      } else if (tile === TILE.FLOWER && Math.random() < 0.25) {
+        // Flower patches: fairy/bug visitors
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        setActiveTrainer(null);
+        setWild(pickByType('fairy', 'bug'));
       }
     },
     [ready, canPlay, wild, activeTrainer, showCenter, showPC, px, py, state.defeatedTrainers, update, showToast],
