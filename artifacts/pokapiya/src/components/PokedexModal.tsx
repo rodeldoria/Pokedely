@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { byId, spriteUrl, displayName } from '../data/pokedex';
+import { byId, spriteUrl, homeSpriteUrl, displayName } from '../data/pokedex';
 import { fetchPokeInfo, getCachedPokeInfo, type PokeInfo } from '../data/pokeapi';
 import type { TrainerState } from '../game/save';
 
@@ -101,11 +101,17 @@ export default function PokedexModal({ state, onClose }: Props) {
                 </div>
                 {isSeen ? (
                   <img
-                    src={spriteUrl(id)}
+                    src={homeSpriteUrl(id)}
                     alt={mon?.name || ''}
                     style={{
-                      width: 56, height: 56, imageRendering: 'pixelated',
+                      width: 64, height: 64,
                       filter: isCaught ? 'none' : 'brightness(0)',
+                    }}
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      img.onerror = null;
+                      img.src = spriteUrl(id);
+                      img.style.imageRendering = 'pixelated';
                     }}
                   />
                 ) : (
@@ -184,9 +190,15 @@ function DexDetail({ id, onClose }: { id: number; onClose: () => void }) {
       >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
           <img
-            src={spriteUrl(id)}
+            src={homeSpriteUrl(id)}
             alt={mon?.name || ''}
-            style={{ width: 96, height: 96, imageRendering: 'pixelated', flexShrink: 0 }}
+            style={{ width: 112, height: 112, flexShrink: 0 }}
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.onerror = null;
+              img.src = spriteUrl(id);
+              img.style.imageRendering = 'pixelated';
+            }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ color: '#7c5a2a', fontSize: 12, fontWeight: 'bold' }}>

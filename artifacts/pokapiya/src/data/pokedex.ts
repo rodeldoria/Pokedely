@@ -9,6 +9,29 @@ export function backSpriteUrl(id: number) {
   return `${SPRITE_BASE}/back/${id}.png`;
 }
 
+// PokeAPI HOME 3D renders — high-res polished art (~256-512px source).
+// Some forms aren't in HOME — callers should provide an `onError` fallback to `spriteUrl`.
+export const HOME_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home';
+export function homeSpriteUrl(id: number, shiny = false) {
+  return `${HOME_BASE}${shiny ? '/shiny' : ''}/${id}.png`;
+}
+
+// Eagerly fetch HOME renders (with pixel fallback) so the battle screen
+// doesn't pop in. Safe to call repeatedly — the browser cache dedupes.
+const preloaded = new Set<string>();
+export function preloadSprites(ids: number[]) {
+  for (const id of ids) {
+    if (!id || preloaded.has(`h${id}`)) continue;
+    preloaded.add(`h${id}`);
+    const home = new Image();
+    home.src = homeSpriteUrl(id);
+    home.onerror = () => {
+      const pix = new Image();
+      pix.src = spriteUrl(id);
+    };
+  }
+}
+
 export interface Pokemon {
   id: number;
   name: string;

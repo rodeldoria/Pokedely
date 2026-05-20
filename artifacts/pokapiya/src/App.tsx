@@ -9,6 +9,7 @@ import StarterModal from './components/StarterModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, earnCoins, type TrainerState } from './game/save';
+import { preloadSprites } from './data/pokedex';
 import QuestModal from './components/QuestModal';
 import MovesModal from './components/MovesModal';
 import CraftModal from './components/CraftModal';
@@ -45,12 +46,14 @@ export default function App() {
   }, []);
 
   const handleEncounter = useCallback((wild: Pokemon) => {
+    preloadSprites([wild.id, ...stateRef.current.team.slice(0, 1).map(m => m.id)]);
     setCurrentTrainer(null);
     setWildPokemon(wild);
     setScreen('battle');
   }, []);
 
   const handleTrainerEncounter = useCallback((wild: Pokemon, trainer: NPCTrainer) => {
+    preloadSprites([wild.id, ...stateRef.current.team.slice(0, 1).map(m => m.id)]);
     setCurrentTrainer(trainer);
     setWildPokemon(wild);
     setScreen('battle');

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Pokemon } from '../data/pokedex';
-import { displayName, spriteUrl, backSpriteUrl } from '../data/pokedex';
+import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl } from '../data/pokedex';
 import { questionFor } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import {
@@ -405,11 +405,16 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           animation: shaking ? 'shake 0.15s infinite' : wildHurt ? 'shake 0.12s 3' : monVisible ? 'popIn 0.5s ease-out' : 'none',
           filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
         }}>
-          <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
-            width: '100%', height: '100%', imageRendering: 'pixelated',
+          <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
+            width: '100%', height: '100%',
             opacity: monVisible ? (caught ? 0 : 1) : 0,
             transition: 'opacity 0.3s',
             filter: 'drop-shadow(0 6px 0 rgba(0,0,0,0.18))',
+          }} onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = spriteUrl(wild.id);
+            img.style.imageRendering = 'pixelated';
           }} />
           {caught && (
             <div style={{
@@ -521,7 +526,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                     color: '#f1ebd6',
                   }}>
-                    <img src={spriteUrl(m.id)} alt={m.name} style={{ width: 56, height: 56, imageRendering: 'pixelated' }} />
+                    <img src={homeSpriteUrl(m.id)} alt={m.name} style={{ width: 64, height: 64 }}
+                      onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(m.id); img.style.imageRendering = 'pixelated'; }} />
                     <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
                     <div style={{ width: '100%', background: '#1a1d21', borderRadius: 4, height: 6 }}>
                       <div style={{ width: `${pct}%`, background: c, height: '100%', borderRadius: 4 }} />
@@ -556,7 +562,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
                         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                         color: '#f1ebd6',
                       }}>
-                        <img src={spriteUrl(m.id)} alt={m.name} style={{ width: 56, height: 56, imageRendering: 'pixelated' }} />
+                        <img src={homeSpriteUrl(m.id)} alt={m.name} style={{ width: 64, height: 64 }}
+                          onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(m.id); img.style.imageRendering = 'pixelated'; }} />
                         <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
                         <div style={{ width: '100%', background: '#1a1d21', borderRadius: 4, height: 6 }}>
                           <div style={{ width: `${pct}%`, background: c, height: '100%', borderRadius: 4 }} />
@@ -778,10 +785,10 @@ function SendOutIntro({ message, addieLevel, wild }: {
           animation: 'popIn 0.4s ease-out 0.2s both',
         }}>VS</div>
         <div style={{ textAlign: 'center', animation: 'slideInRight 0.5s ease-out' }}>
-          <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
-            width: 180, height: 180, imageRendering: 'pixelated',
+          <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
+            width: 180, height: 180,
             filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.35)) drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
-          }} />
+          }} onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(wild.id); img.style.imageRendering = 'pixelated'; }} />
           <div style={{ color: '#ffd54a', fontSize: 16, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
             {displayName(wild)}
           </div>

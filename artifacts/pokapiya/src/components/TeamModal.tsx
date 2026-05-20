@@ -1,5 +1,5 @@
 import type { TrainerState } from '../game/save';
-import { displayName } from '../data/pokedex';
+import { displayName, homeSpriteUrl, spriteUrl } from '../data/pokedex';
 
 interface Props {
   state: TrainerState;
@@ -50,9 +50,15 @@ export default function TeamModal({ state, onClose }: Props) {
                 {member ? (
                   <>
                     <img
-                      src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${member.id}.png`}
+                      src={homeSpriteUrl(member.id)}
                       alt={member.name}
-                      style={{ width: 52, height: 52, imageRendering: 'pixelated' }}
+                      style={{ width: 64, height: 64 }}
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        img.onerror = null;
+                        img.src = spriteUrl(member.id);
+                        img.style.imageRendering = 'pixelated';
+                      }}
                     />
                     <div>
                       <div style={{ color: '#ffd54a', fontWeight: 'bold', fontSize: '15px' }}>
