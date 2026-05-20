@@ -4,7 +4,7 @@ import { displayName, spriteUrl, backSpriteUrl } from '../data/pokedex';
 import { questionFor } from '../data/stem';
 import {
   recordAnswer, recordCatch, useBall, useBerry, getLevel,
-  ensureMemberHp, memberMaxHp,
+  ensureMemberHp, memberMaxHp, xpToNextLevel,
 } from '../game/save';
 import type { TrainerState, PartyMember } from '../game/save';
 
@@ -298,121 +298,138 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     setTimeout(() => safeExit(false, false), 1200);
   }
 
-  const rarityStars = '⭐'.repeat(wild.rarity);
+  const rarityStars = '★'.repeat(wild.rarity);
   const wildHpPct = (wildHp / wildMaxHp) * 100;
   const myMaxHpVal = myMember?.maxHp ?? memberMaxHp(myMember ?? { id:0,name:'?',types:[],caughtAt:0 }, level);
+  const wildHpColor = wildHpPct > 50 ? '#7dd87d' : wildHpPct > 20 ? '#f0c050' : '#e85050';
   const myHpPct = myMember ? (myHpDisplay / myMaxHpVal) * 100 : 0;
-  const wildHpColor = wildHpPct > 50 ? '#4ade80' : wildHpPct > 20 ? '#fbbf24' : '#ef4444';
-  const myHpColor = myHpPct > 50 ? '#4ade80' : myHpPct > 20 ? '#fbbf24' : '#ef4444';
+  const myHpColor = myHpPct > 50 ? '#7dd87d' : myHpPct > 20 ? '#f0c050' : '#e85050';
+  const xp = xpToNextLevel(state);
+  const myType = (myMember?.types[0] || 'normal').toUpperCase();
+  const wildType = wild.types[0].toUpperCase();
 
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 400,
-      background: `linear-gradient(160deg, ${bg}ee 0%, #0a0a0a 100%)`,
+      background: '#1d1f24',
       display: 'flex', flexDirection: 'column',
-      fontFamily: '"Segoe UI", sans-serif',
+      fontFamily: '"Courier New", ui-monospace, monospace',
+      letterSpacing: '0.5px',
     }}>
-      {/* Header */}
+      {/* ── Grass arena ──────────────────────────────────── */}
       <div style={{
-        background: 'rgba(255,248,230,0.12)', borderBottom: '2px solid rgba(255,220,100,0.3)',
-        padding: '8px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        position: 'relative', flex: '1 1 55%', minHeight: 280,
+        background: 'linear-gradient(180deg, #b4e1ff 0%, #d8ecff 35%, #6cc06c 35%, #4ea84e 100%)',
+        overflow: 'hidden', borderBottom: '4px solid #1d1f24',
       }}>
-        <div>
-          <div style={{ color: '#ffd54a', fontWeight: 'bold', fontSize: '18px' }}>
-            {trainerName ? `${trainerName} battle` : `Wild encounter!`}
-          </div>
-          <div style={{ color: text, fontSize: '12px' }}>
-            {wild.types.map(t => t.toUpperCase()).join(' · ')} · Rarity {rarityStars}
-            &nbsp;·&nbsp; <span style={{ color: '#ffd54a' }}>Addie Lv. {level}</span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <Chip icon="🔴" val={state.inventory.pokeball} label="Balls" />
-          <Chip icon="🍓" val={state.inventory.berry} label="Berries" />
-          <button onClick={handleFlee} style={runBtnStyle}>Run (ESC)</button>
-        </div>
-      </div>
+        {/* Grass decoration */}
+        <GrassDecor />
 
-      {/* Arena */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-around', padding: '20px 40px', gap: 16 }}>
-        {/* Player side */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <HpBar name={myMember?.name || '—'} hp={myHpDisplay} max={myMaxHpVal} color={myHpColor} level={level} />
-          <div style={{
-            width: 160, height: 160, position: 'relative',
-            animation: myHurt ? 'shake 0.12s 3' : 'none',
-            filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
-          }}>
-            {myMember && (
-              <img src={backSpriteUrl(myMember.id)} alt={myMember.name} style={{
-                width: '100%', height: '100%', imageRendering: 'pixelated',
-                filter: 'drop-shadow(0 0 14px rgba(255,255,255,0.25))',
-              }} onError={(e) => { (e.currentTarget as HTMLImageElement).src = spriteUrl(myMember.id); }}/>
-            )}
-          </div>
+        {/* Wild Pokémon (top-right) */}
+        <div style={{
+          position: 'absolute', right: '8%', top: '10%',
+          width: 200, height: 200,
+          animation: shaking ? 'shake 0.15s infinite' : wildHurt ? 'shake 0.12s 3' : monVisible ? 'popIn 0.5s ease-out' : 'none',
+          filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
+        }}>
+          <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
+            width: '100%', height: '100%', imageRendering: 'pixelated',
+            opacity: monVisible ? (caught ? 0 : 1) : 0,
+            transition: 'opacity 0.3s',
+            filter: 'drop-shadow(0 6px 0 rgba(0,0,0,0.18))',
+          }} />
+          {caught && (
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '88px', animation: 'popIn 0.4s ease-out',
+            }}>🔴</div>
+          )}
         </div>
 
-        {/* Wild side */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <HpBar name={displayName(wild)} hp={wildHp} max={wildMaxHp} color={wildHpColor} level={level} />
-          <div style={{
-            width: 160, height: 160, position: 'relative',
-            animation: shaking ? 'shake 0.15s infinite' : wildHurt ? 'shake 0.12s 3' : monVisible ? 'popIn 0.5s ease-out' : 'none',
-            filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
-          }}>
-            <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
+        {/* Player Pokémon (bottom-left) */}
+        <div style={{
+          position: 'absolute', left: '14%', bottom: '4%',
+          width: 220, height: 220,
+          animation: myHurt ? 'shake 0.12s 3' : 'none',
+          filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
+        }}>
+          {myMember && (
+            <img src={backSpriteUrl(myMember.id)} alt={myMember.name} style={{
               width: '100%', height: '100%', imageRendering: 'pixelated',
-              filter: caught ? 'brightness(0)' : 'drop-shadow(0 0 16px rgba(255,255,255,0.3))',
-              opacity: monVisible ? 1 : 0,
-              transition: 'opacity 0.3s',
-            }} />
-            {caught && (
-              <div style={{
-                position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '72px', animation: 'popIn 0.4s ease-out',
-              }}>🔴</div>
-            )}
-          </div>
+              filter: 'drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
+            }} onError={(e) => { (e.currentTarget as HTMLImageElement).src = spriteUrl(myMember.id); }}/>
+          )}
         </div>
+
+        {/* Wild HP card (top-left) */}
+        <RetroHpCard
+          name={displayName(wild)} level={level} typeLabel={wildType} stars={rarityStars}
+          hp={wildHp} max={wildMaxHp} color={wildHpColor}
+          showHpNums showExp={false}
+          style={{ position: 'absolute', left: 28, top: 22, minWidth: 280 }}
+        />
+
+        {/* Player HP card (mid-right) */}
+        {myMember && (
+          <RetroHpCard
+            name={myMember.name} level={level} typeLabel={myType} stars=""
+            hp={myHpDisplay} max={myMaxHpVal} color={myHpColor}
+            showHpNums showExp xpHave={xp.have} xpNeed={xp.need}
+            style={{ position: 'absolute', right: 28, bottom: '38%', minWidth: 280 }}
+          />
+        )}
+
+        {/* Run button (top-right) */}
+        <button onClick={handleFlee} style={{
+          position: 'absolute', top: 20, right: 28,
+          background: '#d44a3a', color: '#fff',
+          border: '3px solid #1d1f24', borderRadius: 8,
+          padding: '8px 18px', fontWeight: 'bold', fontSize: 16,
+          fontFamily: 'inherit', letterSpacing: '1px',
+          cursor: 'pointer', boxShadow: '0 4px 0 #7a1f15',
+        }}>Run ×</button>
       </div>
 
-      {/* Action panel */}
+      {/* ── Dialogue strip ──────────────────────────────── */}
       <div style={{
-        background: 'rgba(20,14,4,0.92)', borderTop: '2px solid rgba(255,220,100,0.3)',
-        padding: '14px 24px', minHeight: 200,
+        background: '#f1ebd6', borderTop: '4px solid #1d1f24', borderBottom: '4px solid #1d1f24',
+        padding: '14px 28px', minHeight: 70,
+        color: '#3a3528', fontWeight: 'bold', fontSize: 17,
+        display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
       }}>
-        {log && (
-          <div style={{
-            textAlign: 'center', color: '#fff8e1', fontSize: 16, fontWeight: 'bold', marginBottom: 8,
-          }}>{log}</div>
-        )}
-        {feedback && (
-          <div style={{
-            textAlign: 'center', color: '#ffd54a', fontWeight: 'bold', fontSize: 15,
-            marginBottom: 10, background: 'rgba(255,213,74,0.1)',
-            borderRadius: 10, padding: '6px 14px',
-          }}>{feedback}</div>
-        )}
+        {log && <div style={{ opacity: 0.78 }}>{log}</div>}
+        {feedback && <div style={{ color: '#7a2f1f' }}>▸ {feedback}</div>}
+        {!log && !feedback && <div style={{ opacity: 0.5 }}>…</div>}
+      </div>
 
+      {/* ── Action panel ────────────────────────────────── */}
+      <div style={{
+        background: '#1d1f24', padding: '16px 24px', minHeight: 180,
+      }}>
         {phase === 'menu' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, maxWidth: 720, margin: '0 auto' }}>
-            <ActionBtn color="#ef4444" onClick={() => setPhase('fightMenu')}>⚔️ Fight</ActionBtn>
-            <ActionBtn color="#ec4899" onClick={openCatch} disabled={!!trainerName}>🔴 Catch</ActionBtn>
-            <ActionBtn color="#f59e0b" onClick={handleUseBerry}>🍓 Berry</ActionBtn>
-            <ActionBtn color="#6b7280" onClick={handleFlee}>🏃 Run</ActionBtn>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, maxWidth: 1000, margin: '0 auto' }}>
+            <RetroCard icon="⚔️" title="Fight" sub="Use a move" accent="#e85050" onClick={() => setPhase('fightMenu')} />
+            <RetroCard icon="●" title="Catch" sub={trainerName ? 'Trainer Pokémon' : "Throw a ball"} accent="#e85050" onClick={openCatch} disabled={!!trainerName} />
+            <RetroCard icon="🍓" title="Berry" sub={`×${state.inventory.berry} left`} accent="#ec5f9b" onClick={handleUseBerry} />
+            <RetroCard icon="🏃" title="Run" sub="Flee battle" accent="#9ca3af" onClick={handleFlee} />
           </div>
         )}
 
         {phase === 'fightMenu' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 600, margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, maxWidth: 800, margin: '0 auto' }}>
               {myMoves.map(m => (
-                <ActionBtn key={m.name} color={(TYPE_COLORS[m.type] || TYPE_COLORS.normal)[0]} onClick={() => pickMove(m)}>
-                  {m.emoji} {m.name}
-                </ActionBtn>
+                <RetroCard
+                  key={m.name}
+                  icon={m.emoji}
+                  title={m.name}
+                  sub={`PWR ${m.power} · ${m.type.toUpperCase()}`}
+                  accent={(TYPE_COLORS[m.type] || TYPE_COLORS.normal)[1]}
+                  onClick={() => pickMove(m)}
+                />
               ))}
             </div>
-            <div style={{ textAlign: 'center', marginTop: 10 }}>
+            <div style={{ textAlign: 'center', marginTop: 12 }}>
               <button onClick={() => setPhase('menu')} style={backBtnStyle}>← Back</button>
             </div>
           </div>
@@ -420,27 +437,26 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
 
         {phase === 'question' && (
           <>
-            <div style={{ textAlign: 'center', marginBottom: 6 }}>
-              <span style={{ color: text, fontSize: 12, fontWeight: 'bold' }}>
-                {question.subject} · Lv. {level} question · (Tries: {attemptsLeft})
-              </span>
+            <div style={{ textAlign: 'center', marginBottom: 8, color: '#f0c050', fontSize: 13, fontWeight: 'bold', letterSpacing: '1px' }}>
+              {question.subject.toUpperCase()} · LV {level} QUESTION · TRIES {attemptsLeft}
             </div>
             <div style={{
-              textAlign: 'center', color: '#fff8e1', fontSize: 18, fontWeight: 'bold',
-              marginBottom: 12, lineHeight: 1.4,
+              textAlign: 'center', color: '#f1ebd6', fontSize: 18, fontWeight: 'bold',
+              marginBottom: 14, lineHeight: 1.4,
             }}>{question.prompt}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 700, margin: '0 auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 800, margin: '0 auto' }}>
               {question.choices.map((choice, i) => (
                 <button key={i} onClick={() => handleAnswer(i)} style={{
-                  background: CHOICE_COLORS[i % 4],
+                  background: '#2a2d33',
                   border: `2px solid ${CHOICE_BORDERS[i % 4]}`,
-                  borderRadius: 14, padding: '12px 20px',
-                  fontWeight: 'bold', fontSize: 16, color: '#1a0d00',
-                  cursor: 'pointer', transition: 'filter 0.1s',
+                  borderRadius: 10, padding: '14px 18px',
+                  fontFamily: 'inherit', fontWeight: 'bold', fontSize: 16,
+                  color: '#f1ebd6', cursor: 'pointer', transition: 'filter 0.1s',
+                  letterSpacing: '0.5px',
                 }}
-                  onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.15)')}
-                  onMouseLeave={e => (e.currentTarget.style.filter = 'brightness(1)')}>
-                  {choice}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#3a3d44')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '#2a2d33')}>
+                  {String.fromCharCode(65 + i)}. {choice}
                 </button>
               ))}
             </div>
@@ -451,8 +467,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         )}
 
         {phase === 'throwing' && (
-          <div style={{ textAlign: 'center', color: '#ffd54a', fontSize: 20, fontWeight: 'bold', padding: 20 }}>
-            🔴 Poké Ball flying…
+          <div style={{ textAlign: 'center', color: '#f0c050', fontSize: 22, fontWeight: 'bold', padding: 24, letterSpacing: '2px' }}>
+            ● POKÉ BALL THROWN…
           </div>
         )}
       </div>
@@ -462,69 +478,128 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
       `}</style>
       {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
-      <span style={{ display: 'none' }}>{trainerReward}</span>
+      <span style={{ display: 'none' }}>{trainerReward}{bg}{text}</span>
     </div>
   );
 }
 
-const CHOICE_COLORS = ['#8fd9b6', '#9ec9ef', '#ffb98a', '#d6b3f1'];
-const CHOICE_BORDERS = ['#2d6a4f', '#1e4065', '#7d3a00', '#5b1a8a'];
+const CHOICE_BORDERS = ['#5ba36f', '#5b8aa3', '#a37a4a', '#8a5ba3'];
 
-const runBtnStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.1)', color: '#ccc',
-  border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8,
-  padding: '6px 14px', cursor: 'pointer', fontSize: 13,
-};
 const backBtnStyle: React.CSSProperties = {
-  background: 'transparent', color: '#ffd54a',
-  border: '1px solid rgba(255,213,74,0.4)', borderRadius: 8,
-  padding: '4px 12px', cursor: 'pointer', fontSize: 12,
+  background: 'transparent', color: '#f0c050',
+  border: '1px solid rgba(240,192,80,0.4)', borderRadius: 6,
+  padding: '5px 14px', cursor: 'pointer', fontSize: 12,
+  fontFamily: '"Courier New", monospace', letterSpacing: '1px',
 };
 
-function Chip({ icon, val, label }: { icon: string; val: number; label: string }) {
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <div style={{ color: '#ffd54a', fontWeight: 'bold', fontSize: 18 }}>{icon} {val}</div>
-      <div style={{ color: '#8d7045', fontSize: 11 }}>{label}</div>
-    </div>
-  );
-}
-
-function ActionBtn({ color, onClick, children, disabled }: {
-  color: string; onClick: () => void; children: React.ReactNode; disabled?: boolean;
+function RetroCard({ icon, title, sub, accent, onClick, disabled }: {
+  icon: string; title: string; sub: string; accent: string;
+  onClick: () => void; disabled?: boolean;
 }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      background: disabled ? '#444' : color,
-      border: `3px solid ${disabled ? '#222' : '#fff'}`,
-      borderRadius: 14, padding: '14px 16px',
-      fontWeight: 'bold', fontSize: 17, color: '#fff',
-      cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1,
-      textShadow: '0 1px 2px rgba(0,0,0,0.4)',
-      boxShadow: disabled ? 'none' : '0 4px 0 rgba(0,0,0,0.3)',
-    }}>{children}</button>
+      background: '#2a2d33',
+      border: `2px solid ${disabled ? '#3a3d44' : accent}`,
+      borderRadius: 10, padding: '16px 12px',
+      fontFamily: '"Courier New", monospace', cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.4 : 1,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+      color: '#f1ebd6', transition: 'transform 0.08s, background 0.1s',
+    }}
+      onMouseEnter={e => !disabled && (e.currentTarget.style.background = '#3a3d44')}
+      onMouseLeave={e => !disabled && (e.currentTarget.style.background = '#2a2d33')}
+    >
+      <div style={{ fontSize: 22, color: accent, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: 18, fontWeight: 'bold', letterSpacing: '1px' }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#9aa0a8', letterSpacing: '1px' }}>{sub.toUpperCase()}</div>
+    </button>
   );
 }
 
-function HpBar({ name, hp, max, color, level }: { name: string; hp: number; max: number; color: string; level: number }) {
+function RetroHpCard({
+  name, level, typeLabel, stars, hp, max, color,
+  showHpNums, showExp, xpHave, xpNeed, style,
+}: {
+  name: string; level: number; typeLabel: string; stars: string;
+  hp: number; max: number; color: string;
+  showHpNums?: boolean; showExp?: boolean; xpHave?: number; xpNeed?: number;
+  style?: React.CSSProperties;
+}) {
   const pct = Math.max(0, (hp / max) * 100);
+  const xpPct = showExp && xpNeed ? Math.max(0, Math.min(100, ((xpHave ?? 0) / xpNeed) * 100)) : 0;
   return (
     <div style={{
-      background: 'rgba(0,0,0,0.55)', border: '2px solid rgba(255,213,74,0.5)',
-      borderRadius: 10, padding: '6px 10px', minWidth: 180,
+      background: 'rgba(20,22,28,0.92)',
+      border: '3px solid #f0c050',
+      borderRadius: 10, padding: '10px 14px',
+      boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+      ...style,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fff8e1', fontSize: 13, fontWeight: 'bold' }}>
-        <span>{name}</span>
-        <span style={{ color: '#ffd54a' }}>Lv {level}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+        <span style={{ color: '#f1ebd6', fontWeight: 'bold', fontSize: 18, letterSpacing: '1px' }}>{name}</span>
+        <span style={{ color: '#bfc3cc', fontSize: 13 }}>Lv.{level}</span>
+        {stars && <span style={{ color: '#f0c050', fontSize: 14, marginLeft: 'auto' }}>{stars}</span>}
       </div>
-      <div style={{ background: '#1a0d00', borderRadius: 6, height: 10, marginTop: 4, overflow: 'hidden', border: '1px solid #3a2410' }}>
+      <div style={{
+        display: 'inline-block', marginTop: 6,
+        background: '#3a3528', color: '#f1ebd6', fontSize: 11, fontWeight: 'bold',
+        padding: '3px 10px', borderRadius: 4, letterSpacing: '1px',
+        border: '1px solid #5a5340',
+      }}>{typeLabel}</div>
+      <div style={{
+        background: '#0e0f12', borderRadius: 4, height: 8, marginTop: 8, overflow: 'hidden',
+        border: '1px solid #3a3d44',
+      }}>
         <div style={{
           width: `${pct}%`, height: '100%', background: color, transition: 'width 0.4s ease-out',
         }} />
       </div>
-      <div style={{ color: '#ffd54a', fontSize: 11, textAlign: 'right', marginTop: 2 }}>
-        {Math.ceil(hp)} / {max}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 12, fontWeight: 'bold' }}>
+        {showHpNums && (
+          <span style={{ color: '#bfc3cc' }}>{Math.ceil(hp)}/{max} HP</span>
+        )}
+        {showExp && xpNeed && (
+          <span style={{ color: '#7fb5ff' }}>EXP {xpHave}/{xpNeed}</span>
+        )}
       </div>
+      {showExp && xpNeed && (
+        <div style={{
+          background: '#0e0f12', borderRadius: 4, height: 5, marginTop: 2, overflow: 'hidden',
+          border: '1px solid #3a3d44',
+        }}>
+          <div style={{ width: `${xpPct}%`, height: '100%', background: '#5b8aff', transition: 'width 0.4s' }} />
+        </div>
+      )}
     </div>
+  );
+}
+
+function GrassDecor() {
+  // Cute pixel grass + flowers + bg trees
+  return (
+    <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} preserveAspectRatio="none" viewBox="0 0 1000 600">
+      {/* Distant tree line */}
+      {Array.from({ length: 22 }).map((_, i) => (
+        <polygon key={i}
+          points={`${30 + i * 45},220 ${42 + i * 45},195 ${54 + i * 45},220`}
+          fill="#3a7a3a" opacity="0.75"
+        />
+      ))}
+      {/* Flowers scattered */}
+      {[[160,300,'#f7d24a'],[290,360,'#ff8fb1'],[420,330,'#f7d24a'],[560,380,'#ff8fb1'],[700,310,'#f7d24a'],[820,400,'#fff']].map(([x,y,c],i) => (
+        <circle key={i} cx={x as number} cy={y as number} r="5" fill={c as string} stroke="#1d1f24" strokeWidth="1.5"/>
+      ))}
+      {/* Grass tufts */}
+      {Array.from({ length: 30 }).map((_, i) => {
+        const x = 20 + (i * 33) % 980;
+        const y = 460 + ((i * 53) % 120);
+        return (
+          <g key={i}>
+            <path d={`M${x},${y} l-4,-8 M${x},${y} l0,-10 M${x},${y} l4,-8`}
+              stroke="#3d8b3d" strokeWidth="2.5" strokeLinecap="round" fill="none"/>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
