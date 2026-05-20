@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { getLevel, xpToNextLevel, type TrainerState } from '../game/save';
+import { subscribeCloudStatus, type CloudStatus } from '../game/cloudSave';
 
 interface Props {
   state: TrainerState;
@@ -8,11 +10,23 @@ interface Props {
   onQuests: () => void;
   onMoves: () => void;
   onCraft: () => void;
+  onBox: () => void;
   onSave: () => void;
   toast: string;
 }
 
-export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMoves, onCraft, onSave, toast }: Props) {
+const CLOUD_LABEL: Record<CloudStatus, { text: string; bg: string; fg: string }> = {
+  idle:    { text: '☁️ Cloud',        bg: 'rgba(255,255,255,0.08)', fg: '#cfd6f0' },
+  syncing: { text: '☁️ Syncing…',     bg: 'rgba(90,115,196,0.25)',  fg: '#a8d8ff' },
+  saved:   { text: '☁️ Saved',         bg: 'rgba(74,222,128,0.18)',  fg: '#4ade80' },
+  error:   { text: '☁️ Save failed',   bg: 'rgba(214,57,70,0.20)',   fg: '#ff8a8a' },
+  offline: { text: '☁️ Offline',       bg: 'rgba(255,212,74,0.18)',  fg: '#ffd54a' },
+};
+
+export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMoves, onCraft, onBox, onSave, toast }: Props) {
+  const [cloud, setCloud] = useState<CloudStatus>('idle');
+  useEffect(() => subscribeCloudStatus(setCloud), []);
+  const cloudLabel = CLOUD_LABEL[cloud];
   const total = state.stats.correct + state.stats.wrong;
   const acc = total > 0 ? Math.round((state.stats.correct / total) * 100) : 100;
   const level = getLevel(state);
@@ -54,6 +68,11 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
           <Chip label="📍" value={zoneName} />
           {state.inventory.cut > 0 && <Badge>✂️ Cut</Badge>}
           {state.inventory.rod > 0 && <Badge>🎣 Rod</Badge>}
+          <span title={`Cloud sync: ${cloud}`} style={{
+            background: cloudLabel.bg, color: cloudLabel.fg,
+            border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6,
+            padding: '2px 8px', fontSize: 12, fontWeight: 'bold',
+          }}>{cloudLabel.text}</span>
         </div>
 
         <button onClick={onMoves} style={btnStyle('#16a34a')}>📚 Moves (M)</button>
@@ -61,6 +80,7 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
         <button onClick={onQuests} style={btnStyle('#b85cff')}>📜 Quests (Q)</button>
         <button onClick={onPokedex} style={btnStyle('#5a73c4')}>📕 Pokédex (P)</button>
         <button onClick={onTeam} style={btnStyle('#d63946')}>👥 Team (T)</button>
+        <button onClick={onBox} style={btnStyle('#8a5cff')}>📦 Box (B)</button>
         <button onClick={onSave} style={btnStyle('#2d8a52')}>💾 Save</button>
       </div>
 
@@ -74,7 +94,7 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
         <div><b>F</b> — Cut tree / Fish at water</div>
         <div><b>Space</b> near a trainer — Battle</div>
         <div><b>T</b> Team · <b>P</b> Pokédex · <b>Q</b> Quests</div>
-        <div><b>M</b> Moves · <b>C</b> Craft</div>
+        <div><b>M</b> Moves · <b>C</b> Craft · <b>B</b> Box</div>
       </div>
 
       {state.team.length > 0 && (

@@ -9,6 +9,7 @@ import StarterModal from './components/StarterModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, earnCoins, type TrainerState } from './game/save';
+import { loadCloudSave, queueCloudSave } from './game/cloudSave';
 import { preloadSprites } from './data/pokedex';
 import QuestModal from './components/QuestModal';
 import MovesModal from './components/MovesModal';
@@ -89,6 +90,7 @@ export default function App() {
   const handleStateChange = useCallback((newState: TrainerState) => {
     stateRef.current = newState;
     save(newState);
+    queueCloudSave(newState);
     forceUpdate(n => n + 1);
     // If any team member is ready to evolve, surface the first one as a modal.
     // The player explicitly confirms or declines — no automatic evolution and
@@ -128,6 +130,9 @@ export default function App() {
     forceUpdate(n => n + 1);
   }, [showToast]);
 
+  // Track where the Box was opened from so its close button returns there.
+  const pcReturnRef = useRef<'world' | 'pokecenter'>('world');
+
   // Global keys
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -138,14 +143,44 @@ export default function App() {
         if (k === 'q') setScreen('quests');
         if (k === 'm') setScreen('moves');
         if (k === 'c') setScreen('craft');
+        if (k === 'b') { pcReturnRef.current = 'world'; setScreen('pc'); }
       } else if (k === 'escape') {
-        if (screen === 'team' || screen === 'pokedex' || screen === 'pc' ||
+        if (screen === 'team' || screen === 'pokedex' ||
             screen === 'quests' || screen === 'moves' || screen === 'craft') setScreen('world');
+        if (screen === 'pc') setScreen(pcReturnRef.current);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [screen]);
+
+  // On mount, try to pull a newer save from the cloud. If the cloud copy is
+  // newer than what we loaded from localStorage (or local has fewer caught
+  // Pokémon), prefer the cloud snapshot so Addie sees all her catches.
+  const cloudHydratedRef = useRef(false);
+  useEffect(() => {
+    if (cloudHydratedRef.current) return;
+    cloudHydratedRef.current = true;
+    (async () => {
+      const cloud = await loadCloudSave();
+      if (!cloud) return;
+      const local = stateRef.current;
+      const cloudCaught = (cloud.team?.length ?? 0) + (cloud.box?.length ?? 0);
+      const localCaught = (local.team?.length ?? 0) + (local.box?.length ?? 0);
+      const cloudXp = cloud.stats?.correct ?? 0;
+      const localXp = local.stats?.correct ?? 0;
+      // Use cloud if it has more Pokémon OR more XP than local — that's the
+      // canonical "more progress" signal for a 6-year-old.
+      if (cloudCaught > localCaught || (cloudCaught === localCaught && cloudXp > localXp)) {
+        stateRef.current = cloud;
+        save(cloud);
+        forceUpdate(n => n + 1);
+      } else if (localCaught > 0) {
+        // Push local up so the cloud row reflects current progress.
+        queueCloudSave(local);
+      }
+    })();
+  }, []);
 
   const trainerState = stateRef.current;
   const zoneName = gameRef.current?.getZoneName() ?? 'Town';
@@ -174,8 +209,10 @@ export default function App() {
           onQuests={() => setScreen('quests')}
           onMoves={() => setScreen('moves')}
           onCraft={() => setScreen('craft')}
+          onBox={() => { pcReturnRef.current = 'world'; setScreen('pc'); }}
           onSave={() => {
             save(trainerState);
+            queueCloudSave(trainerState);
             showToast('💾 Game saved!');
           }}
           toast={toast}
@@ -230,7 +267,7 @@ export default function App() {
       )}
 
       {screen === 'pc' && (
-        <PCModal state={trainerState} onChange={handleStateChange} onClose={() => setScreen('pokecenter')} />
+        <PCModal state={trainerState} onChange={handleStateChange} onClose={() => setScreen(pcReturnRef.current)} />
       )}
 
       {screen === 'pokecenter' && (
@@ -238,7 +275,7 @@ export default function App() {
           state={trainerState}
           onChange={handleStateChange}
           onClose={handlePokecenterClose}
-          onPC={() => setScreen('pc')}
+          onPC={() => { pcReturnRef.current = 'pokecenter'; setScreen('pc'); }}
         />
       )}
 
