@@ -20,6 +20,8 @@ export function ensureMemberHp(m: PartyMember, trainerLevel: number) {
   if (typeof m.hp !== 'number') m.hp = m.maxHp;
 }
 
+export type TrainerReward = 'cut' | 'rod' | 'pokeballs' | 'berries';
+
 export interface TrainerState {
   trainer: { name: string; steps: number };
   team: PartyMember[];
@@ -32,9 +34,12 @@ export interface TrainerState {
   defeatedTrainers: Record<string, boolean>;
   visitedCenter: number;
   starterChosen: boolean;
+  oakSeen: boolean;
+  playerPos: { x: number; y: number };
 }
 
-const KEY = 'pokapiya.mobile.save.v1';
+const KEY = 'pokapiya.mobile.save.v2';
+export const SPAWN = { x: 5, y: 9 };
 
 export const emptyState = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
@@ -48,6 +53,8 @@ export const emptyState = (): TrainerState => ({
   defeatedTrainers: {},
   visitedCenter: 0,
   starterChosen: false,
+  oakSeen: false,
+  playerPos: { ...SPAWN },
 });
 
 export async function loadState(): Promise<TrainerState> {
@@ -64,6 +71,7 @@ export async function loadState(): Promise<TrainerState> {
       worldItems: parsed.worldItems || {},
       cutTrees: parsed.cutTrees || {},
       defeatedTrainers: parsed.defeatedTrainers || {},
+      playerPos: parsed.playerPos || { ...SPAWN },
     };
   } catch {
     return emptyState();
@@ -146,4 +154,22 @@ export function healAtCenterMut(state: TrainerState) {
   state.inventory.pokeball += 3;
   state.inventory.berry += 1;
   healTeamMut(state);
+}
+
+export function defeatTrainerMut(state: TrainerState, id: string) {
+  state.defeatedTrainers[id] = true;
+}
+
+export const REWARD_LABELS: Record<TrainerReward, string> = {
+  cut: '✂️ Cut HM',
+  rod: '🎣 Fishing Rod',
+  pokeballs: '5× Poké Balls',
+  berries: '3× Berries',
+};
+
+export function awardRewardMut(state: TrainerState, reward: TrainerReward) {
+  if (reward === 'cut') state.inventory.cut = 1;
+  if (reward === 'rod') state.inventory.rod = 1;
+  if (reward === 'pokeballs') state.inventory.pokeball += 5;
+  if (reward === 'berries') state.inventory.berry += 3;
 }
