@@ -6,12 +6,13 @@ import PokeCenterModal from './components/PokeCenterModal';
 import PokedexModal from './components/PokedexModal';
 import PCModal from './components/PCModal';
 import StarterModal from './components/StarterModal';
+import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, type TrainerState } from './game/save';
 import type { Pokemon } from './data/pokedex';
 import type { NPCTrainer } from './game/world';
 
-type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter';
+type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak';
 
 const REWARD_LABELS: Record<string, string> = {
   cut: '✂️ Cut HM',
@@ -23,7 +24,7 @@ const REWARD_LABELS: Record<string, string> = {
 export default function App() {
   const stateRef = useRef<TrainerState>(load());
   const [, forceUpdate] = useState(0);
-  const [screen, setScreen] = useState<Screen>(stateRef.current.starterChosen ? 'world' : 'starter');
+  const [screen, setScreen] = useState<Screen>(stateRef.current.starterChosen ? 'world' : 'oak');
   const [wildPokemon, setWildPokemon] = useState<Pokemon | null>(null);
   const [currentTrainer, setCurrentTrainer] = useState<NPCTrainer | null>(null);
   const [toast, setToast] = useState('');
@@ -51,8 +52,8 @@ export default function App() {
     if (screen === 'world') setScreen('pokecenter');
   }, [screen]);
 
-  const handleBattleExit = useCallback((caught: boolean) => {
-    if (caught && currentTrainer) {
+  const handleBattleExit = useCallback((caught: boolean, defeatedTrainer: boolean) => {
+    if (defeatedTrainer && currentTrainer) {
       defeatTrainer(stateRef.current, currentTrainer.id);
       const reward = currentTrainer.reward;
       const inv = stateRef.current.inventory as Record<string, number>;
@@ -120,6 +121,10 @@ export default function App() {
           onPokedex={() => setScreen('pokedex')}
           toast={toast}
         />
+      )}
+
+      {screen === 'oak' && (
+        <OakIntro onDone={() => setScreen('starter')} />
       )}
 
       {screen === 'starter' && (

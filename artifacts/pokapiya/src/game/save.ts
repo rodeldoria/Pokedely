@@ -5,6 +5,27 @@ export interface PartyMember {
   name: string;
   types: string[];
   caughtAt: number;
+  hp?: number;
+  maxHp?: number;
+}
+
+export function memberMaxHp(_m: PartyMember, trainerLevel: number): number {
+  return 50 + trainerLevel * 6;
+}
+
+export function ensureMemberHp(m: PartyMember, trainerLevel: number) {
+  const max = memberMaxHp(m, trainerLevel);
+  if (typeof m.maxHp !== 'number') m.maxHp = max;
+  if (typeof m.hp !== 'number') m.hp = m.maxHp;
+}
+
+export function healTeam(state: TrainerState) {
+  const lvl = getLevel(state);
+  for (const m of state.team) {
+    m.maxHp = memberMaxHp(m, lvl);
+    m.hp = m.maxHp;
+  }
+  save(state);
 }
 
 export interface TrainerState {
@@ -131,6 +152,7 @@ export function healAtCenter(state: TrainerState) {
   state.visitedCenter += 1;
   state.inventory.pokeball += 3;
   state.inventory.berry += 1;
+  healTeam(state);
   save(state);
 }
 

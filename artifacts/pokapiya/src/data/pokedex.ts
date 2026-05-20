@@ -5,6 +5,10 @@ export function spriteUrl(id: number, shiny = false) {
   return `${(shiny ? SHINY_BASE : SPRITE_BASE)}/${id}.png`;
 }
 
+export function backSpriteUrl(id: number) {
+  return `${SPRITE_BASE}/back/${id}.png`;
+}
+
 export interface Pokemon {
   id: number;
   name: string;
