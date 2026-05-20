@@ -9,10 +9,12 @@ import StarterModal from './components/StarterModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, type TrainerState } from './game/save';
+import { checkEvolutions } from './game/evolution';
+import QuestModal from './components/QuestModal';
 import type { Pokemon } from './data/pokedex';
 import type { NPCTrainer } from './game/world';
 
-type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak';
+type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak' | 'quests';
 
 const REWARD_LABELS: Record<string, string> = {
   cut: '✂️ Cut HM',
@@ -73,10 +75,21 @@ export default function App() {
   }, [wildPokemon, currentTrainer, showToast]);
 
   const handleStateChange = useCallback((newState: TrainerState) => {
+    // Check for evolutions before persisting — any team member that crossed
+    // its threshold gets its id/name/types updated in-place.
+    const evos = checkEvolutions(newState);
     stateRef.current = newState;
     save(newState);
     forceUpdate(n => n + 1);
-  }, []);
+    if (evos.length > 0) {
+      // Queue one toast per evolution, spaced apart so they don't overlap.
+      evos.forEach((evo, i) => {
+        setTimeout(() => {
+          showToast(`✨ ${evo.beforeName} evolved into ${evo.afterName}!`);
+        }, i * 2600);
+      });
+    }
+  }, [showToast]);
 
   const handlePokecenterClose = useCallback(() => {
     // Nudge the player off the door tile so the center doesn't immediately re-open.
@@ -93,8 +106,9 @@ export default function App() {
       if (screen === 'world') {
         if (k === 't') setScreen('team');
         if (k === 'p') setScreen('pokedex');
+        if (k === 'q') setScreen('quests');
       } else if (k === 'escape') {
-        if (screen === 'team' || screen === 'pokedex' || screen === 'pc') setScreen('world');
+        if (screen === 'team' || screen === 'pokedex' || screen === 'pc' || screen === 'quests') setScreen('world');
       }
     };
     window.addEventListener('keydown', handler);
@@ -123,6 +137,7 @@ export default function App() {
           state={trainerState}
           onTeam={() => setScreen('team')}
           onPokedex={() => setScreen('pokedex')}
+          onQuests={() => setScreen('quests')}
           onSave={() => {
             save(trainerState);
             showToast('💾 Game saved!');
@@ -164,6 +179,10 @@ export default function App() {
 
       {screen === 'pokedex' && (
         <PokedexModal state={trainerState} onClose={() => setScreen('world')} />
+      )}
+
+      {screen === 'quests' && (
+        <QuestModal state={trainerState} onClose={() => setScreen('world')} />
       )}
 
       {screen === 'pc' && (

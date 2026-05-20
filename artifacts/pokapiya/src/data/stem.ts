@@ -27,30 +27,38 @@ function shuffleChoices(q: Question): Question {
   return { ...q, choices: indexed.map(p => p.c), answerIndex: correctNew };
 }
 
-// Categories sorted by approximate difficulty for a 6-year-old
+// Categories sorted by approximate difficulty. Slice 5 added second-grade
+// material — multiplication, planets, bugs, computer_science, and
+// reading-with-stories — so MEDIUM and HARD got pulled in to match.
 const EASY = ['colors', 'shapes', 'counting', 'animals', 'opposites', 'addie'];
-const MEDIUM = ['spelling', 'alphabet', 'rhymes', 'patterns', 'categorize', 'science'];
-const HARD = ['math', 'subtraction', 'reading'];
+const MEDIUM = [
+  'spelling', 'alphabet', 'rhymes', 'patterns', 'categorize', 'science',
+  'bugs', 'planets'
+];
+const HARD = [
+  'math', 'subtraction', 'reading',
+  'multiplication', 'computer_science', 'reading_stories'
+];
 
 const TYPE_TO_CATEGORY: Record<string, string[]> = {
-  grass: ['animals','science','spelling','addie'],
-  bug: ['animals','spelling','counting'],
-  water: ['animals','science','categorize'],
-  fire: ['colors','science','opposites'],
-  electric: ['science','patterns','math','addie'],
-  ice: ['science','opposites','colors'],
-  steel: ['shapes','patterns','math'],
-  rock: ['shapes','science','categorize'],
-  ground: ['science','shapes','counting'],
-  flying: ['animals','patterns','reading'],
-  fighting: ['math','subtraction','opposites'],
-  poison: ['categorize','opposites','colors'],
-  psychic: ['patterns','alphabet','reading'],
-  ghost: ['rhymes','alphabet','patterns'],
-  dragon: ['math','subtraction','reading'],
-  fairy: ['rhymes','spelling','colors','addie'],
-  normal: ['spelling','counting','animals','addie'],
-  dark: ['opposites','rhymes','alphabet'],
+  grass:   ['animals','science','spelling','addie','bugs'],
+  bug:     ['animals','spelling','counting','bugs','science'],
+  water:   ['animals','science','categorize','reading_stories'],
+  fire:    ['colors','science','opposites','planets'],
+  electric:['science','patterns','math','addie','computer_science','multiplication'],
+  ice:     ['science','opposites','colors','planets'],
+  steel:   ['shapes','patterns','math','computer_science','multiplication'],
+  rock:    ['shapes','science','categorize','planets'],
+  ground:  ['science','shapes','counting','bugs'],
+  flying:  ['animals','patterns','reading','reading_stories'],
+  fighting:['math','subtraction','opposites','multiplication'],
+  poison:  ['categorize','opposites','colors','bugs'],
+  psychic: ['patterns','alphabet','reading','computer_science','reading_stories'],
+  ghost:   ['rhymes','alphabet','patterns','computer_science'],
+  dragon:  ['math','subtraction','reading','multiplication','reading_stories'],
+  fairy:   ['rhymes','spelling','colors','addie'],
+  normal:  ['spelling','counting','animals','addie','reading_stories'],
+  dark:    ['opposites','rhymes','alphabet','computer_science'],
 };
 
 const ALL_CATEGORIES = Object.keys(typedBank.categories);
