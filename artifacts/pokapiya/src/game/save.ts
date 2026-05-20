@@ -37,7 +37,7 @@ export interface TrainerState {
   box: PartyMember[];
   pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
   stats: { correct: number; wrong: number; caught: number; encounters: number };
-  inventory: { pokeball: number; berry: number; cut: number; rod: number };
+  inventory: { pokeball: number; berry: number; cut: number; rod: number; coin: number; lumber: number; stone: number; seed: number };
   worldItems: Record<string, boolean>;
   cutTrees: Record<string, boolean>;
   defeatedTrainers: Record<string, boolean>;
@@ -53,7 +53,7 @@ const empty = (): TrainerState => ({
   box: [],
   pokedex: {},
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
-  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0 },
+  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0, lumber: 0, stone: 0, seed: 0 },
   worldItems: {},
   cutTrees: {},
   defeatedTrainers: {},
@@ -186,4 +186,61 @@ export function cutTree(state: TrainerState, x: number, y: number) {
 export function defeatTrainer(state: TrainerState, id: string) {
   state.defeatedTrainers[id] = true;
   save(state);
+}
+
+export function earnCoins(state: TrainerState, n: number) {
+  state.inventory.coin = (state.inventory.coin || 0) + n;
+  save(state);
+}
+
+export function spendCoins(state: TrainerState, n: number): boolean {
+  if ((state.inventory.coin || 0) < n) return false;
+  state.inventory.coin -= n;
+  save(state);
+  return true;
+}
+
+export function craft(state: TrainerState, recipeId: string): boolean {
+  const inv = state.inventory;
+  switch (recipeId) {
+    case 'fence': // 2 lumber → +1 fence (decorative — counted in coin for now)
+      if (inv.lumber < 2) return false;
+      inv.lumber -= 2;
+      inv.coin += 3; // crafted item rewards 3 coins for now
+      save(state);
+      return true;
+    case 'path': // 2 stone → +1 path tile
+      if (inv.stone < 2) return false;
+      inv.stone -= 2;
+      inv.coin += 3;
+      save(state);
+      return true;
+    case 'berry-tree': // 1 seed + 1 lumber → +1 berry tree
+      if (inv.seed < 1 || inv.lumber < 1) return false;
+      inv.seed -= 1;
+      inv.lumber -= 1;
+      inv.berry += 2; // tree immediately ripens (simplified)
+      save(state);
+      return true;
+    case 'sell-berry': // 1 berry → 5 coins
+      if (inv.berry < 1) return false;
+      inv.berry -= 1;
+      inv.coin += 5;
+      save(state);
+      return true;
+    case 'buy-pokeball': // 8 coins → 1 pokeball
+      if (inv.coin < 8) return false;
+      inv.coin -= 8;
+      inv.pokeball += 1;
+      save(state);
+      return true;
+    case 'buy-berry': // 5 coins → 1 berry
+      if (inv.coin < 5) return false;
+      inv.coin -= 5;
+      inv.berry += 1;
+      save(state);
+      return true;
+    default:
+      return false;
+  }
 }

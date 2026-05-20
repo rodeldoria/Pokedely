@@ -131,8 +131,67 @@ const QUESTS: Quest[] = [
   {
     id: 'beat-trainer',
     label: 'Defeat your first NPC trainer',
-    detail: 'Trainers in the world will challenge you to a battle. Win to earn items!',
+    detail: 'Trainers in the world will challenge you to a battle. Win to earn items and Pokapiya coins!',
     done: s => Object.keys(s.defeatedTrainers || {}).length >= 1
+  },
+  {
+    id: 'first-coins',
+    label: 'Earn your first 🪙 Pokapiya coins',
+    detail: 'Defeat a trainer to get 12 coins, then visit the Workshop (press C) to spend them.',
+    done: s => (s.inventory.coin || 0) >= 1
+  },
+  {
+    id: 'learn-cut',
+    label: 'Learn the Cut move',
+    detail: 'Catch a Bug-type (Caterpie, Weedle, Scyther) — they teach Cut! Open the Moves panel (M) to see what you know.',
+    done: s => s.team.some(m => m.types.includes('bug'))
+  },
+  {
+    id: 'learn-plant',
+    label: 'Learn the Plant move',
+    detail: 'Catch a Grass-type (Bulbasaur, Oddish, Bellsprout). Bulbasaur is the official Pokopia gardener!',
+    done: s => s.team.some(m => m.types.includes('grass'))
+  },
+  {
+    id: 'learn-smash',
+    label: 'Learn Rock Smash',
+    detail: 'Catch a Fighting-type or Rock-type (Machop, Geodude, Onix). They smash boulders!',
+    done: s => s.team.some(m => m.types.includes('fighting') || m.types.includes('rock'))
+  },
+  {
+    id: 'three-moves',
+    label: 'Learn 3 field moves',
+    detail: 'Build a diverse team to teach Addie more moves.',
+    done: s => {
+      const types = new Set<string>();
+      for (const member of s.team) for (const t of member.types) types.add(t);
+      const moves = ['bug', 'grass', 'fighting', 'rock', 'water', 'electric', 'flying']
+        .filter(t => types.has(t));
+      // bug→cut, grass→plant, (fighting OR rock)→smash, water→water, electric→spark, flying→fly
+      const learned = new Set<string>();
+      for (const t of moves) {
+        if (t === 'bug') learned.add('cut');
+        if (t === 'grass') learned.add('plant');
+        if (t === 'fighting' || t === 'rock') learned.add('smash');
+        if (t === 'water') learned.add('water');
+        if (t === 'electric') learned.add('spark');
+        if (t === 'flying') learned.add('fly');
+      }
+      return learned.size >= 3;
+    }
+  },
+  {
+    id: 'craft-something',
+    label: 'Make something in the Workshop',
+    detail: 'Press C, then trade berries for coins or craft a fence/path/berry tree.',
+    done: s => (s.inventory.coin || 0) >= 5 || (s.inventory.berry || 0) >= 3 // proxy: workshop activity
+  },
+  {
+    id: 'fifty-coins',
+    label: 'Save up 50 🪙 coins',
+    detail: 'Beat lots of trainers and sell extras at the Workshop.',
+    done: s => (s.inventory.coin || 0) >= 50,
+    progress: s => `${Math.min(s.inventory.coin || 0, 50)} / 50`
   },
   {
     id: 'cut-tree',

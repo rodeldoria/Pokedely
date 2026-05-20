@@ -5,11 +5,13 @@ interface Props {
   onTeam: () => void;
   onPokedex: () => void;
   onQuests: () => void;
+  onMoves: () => void;
+  onCraft: () => void;
   onSave: () => void;
   toast: string;
 }
 
-export default function HUD({ state, onTeam, onPokedex, onQuests, onSave, toast }: Props) {
+export default function HUD({ state, onTeam, onPokedex, onQuests, onMoves, onCraft, onSave, toast }: Props) {
   const total = state.stats.correct + state.stats.wrong;
   const acc = total > 0 ? Math.round((state.stats.correct / total) * 100) : 100;
   const level = getLevel(state);
@@ -46,11 +48,14 @@ export default function HUD({ state, onTeam, onPokedex, onQuests, onSave, toast 
           <Chip label="⭐" value={`${state.stats.caught}`} />
           <Chip label="🔴" value={`${state.inventory.pokeball}`} />
           <Chip label="🍓" value={`${state.inventory.berry}`} />
+          <Chip label="🪙" value={`${state.inventory.coin || 0}`} />
           <Chip label="🧠" value={`${acc}%`} />
           {state.inventory.cut > 0 && <Badge>✂️ Cut</Badge>}
           {state.inventory.rod > 0 && <Badge>🎣 Rod</Badge>}
         </div>
 
+        <button onClick={onMoves} style={btnStyle('#16a34a')}>📚 Moves (M)</button>
+        <button onClick={onCraft} style={btnStyle('#c2410c')}>🔨 Craft (C)</button>
         <button onClick={onQuests} style={btnStyle('#b85cff')}>📜 Quests (Q)</button>
         <button onClick={onPokedex} style={btnStyle('#5a73c4')}>📕 Pokédex (P)</button>
         <button onClick={onTeam} style={btnStyle('#d63946')}>👥 Team (T)</button>
@@ -67,6 +72,7 @@ export default function HUD({ state, onTeam, onPokedex, onQuests, onSave, toast 
         <div><b>F</b> — Cut tree / Fish at water</div>
         <div><b>Space</b> near a trainer — Battle</div>
         <div><b>T</b> Team · <b>P</b> Pokédex · <b>Q</b> Quests</div>
+        <div><b>M</b> Moves · <b>C</b> Craft</div>
       </div>
 
       {state.team.length > 0 && (
