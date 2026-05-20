@@ -89,7 +89,7 @@ function calcDamage(move: Move, defenderTypes: string[], level: number): number 
   return Math.max(2, Math.round((base + variance) * eff));
 }
 
-type Phase = 'sendOut' | 'appear' | 'menu' | 'fightMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
+type Phase = 'sendOut' | 'appear' | 'menu' | 'fightMenu' | 'swapMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
 
 export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward }: Props) {
   const level = getLevel(state);
@@ -113,15 +113,21 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const [monVisible, setMonVisible] = useState(false);
   const [caught, setCaught] = useState(false);
   const exited = useRef(false);
+  // Bumped whenever the active lead changes (e.g., swap) so queued
+  // enemy-turn timers can no-op rather than hit the wrong Pokémon.
+  const turnToken = useRef(0);
 
   const [bg, text] = TYPE_COLORS[wild.types[0]] || TYPE_COLORS.normal;
   const myMoves = useMemo(() => getMoves(myMember?.types || ['normal']), [myMember]);
 
-  // Persist my Pokémon HP after every change
+  // Persist HP on whichever Pokémon is currently in the lead slot
+  // (re-read at call time so swaps don't write to a stale closure).
   function commitMyHp(newHp: number) {
-    if (!myMember) return;
-    myMember.hp = Math.max(0, Math.min(myMember.maxHp ?? memberMaxHp(myMember, level), newHp));
-    setMyHpDisplay(myMember.hp);
+    const lead = state.team[0];
+    if (!lead) return;
+    ensureMemberHp(lead, level);
+    lead.hp = Math.max(0, Math.min(lead.maxHp ?? memberMaxHp(lead, level), newHp));
+    setMyHpDisplay(lead.hp);
     onStateChange({ ...state });
   }
 
@@ -171,15 +177,22 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   }
 
   function enemyTurn() {
-    if (!myMember) return;
+    const token = turnToken.current;
+    const lead0 = state.team[0];
+    if (!lead0) return;
     setPhase('enemyTurn');
     const wildMove = getMoves(wild.types)[Math.random() < 0.5 ? 0 : 1];
     setLog(`Wild ${displayName(wild)} used ${wildMove.name}! ${wildMove.emoji}`);
     setFeedback('');
     setTimeout(() => setMyHurt(true), 150);
     setTimeout(() => {
-      const dmg = calcDamage(wildMove, myMember.types, Math.max(1, Math.floor(level * 0.8)));
-      const newMyHp = Math.max(0, (myMember.hp ?? myMember.maxHp ?? 0) - dmg);
+      // Re-read the lead at execution time and bail if a swap happened.
+      if (turnToken.current !== token) return;
+      const lead = state.team[0];
+      if (!lead) return;
+      ensureMemberHp(lead, level);
+      const dmg = calcDamage(wildMove, lead.types, Math.max(1, Math.floor(level * 0.8)));
+      const newMyHp = Math.max(0, (lead.hp ?? lead.maxHp ?? 0) - dmg);
       commitMyHp(newMyHp);
       if (newMyHp <= 0) {
         setTimeout(() => onMyFaint(), 700);
@@ -297,6 +310,31 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     onStateChange({ ...state });
     setFeedback('🍓 You gave it a Berry — it likes you more now!');
     setTimeout(() => setFeedback(''), 1400);
+  }
+
+  function pickSwap(idx: number) {
+    // Only legal from the swap menu (defensive — UI also gates this)
+    if (phase !== 'swapMenu' && phase !== 'menu') return;
+    if (idx === 0 || !state.team[idx]) return;
+    const target = state.team[idx];
+    ensureMemberHp(target, level);
+    if ((target.hp ?? 0) <= 0) {
+      setFeedback(`${target.name} has no energy left!`);
+      setTimeout(() => setFeedback(''), 1400);
+      return;
+    }
+    // Swap into lead slot and invalidate any queued enemy-turn timers
+    const newTeam = [...state.team];
+    [newTeam[0], newTeam[idx]] = [newTeam[idx], newTeam[0]];
+    state.team = newTeam;
+    turnToken.current += 1;
+    onStateChange({ ...state });
+    setMyHpDisplay(newTeam[0].hp ?? newTeam[0].maxHp ?? 0);
+    setLog(`Go, ${newTeam[0].name}!`);
+    setFeedback('');
+    setPhase('enemyTurn');
+    // Opponent gets a free turn after swap
+    setTimeout(() => enemyTurn(), 700);
   }
 
   function handleFlee() {
@@ -422,11 +460,53 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         background: '#1d1f24', padding: '16px 24px', minHeight: 180,
       }}>
         {phase === 'menu' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, maxWidth: 1100, margin: '0 auto' }}>
             <RetroCard icon="⚔️" title="Fight" sub="Use a move" accent="#e85050" onClick={() => setPhase('fightMenu')} />
+            <RetroCard icon="🔄" title="Swap" sub={state.team.length > 1 ? `${state.team.length} on team` : 'Need 2+'} accent="#5ba36f" onClick={() => setPhase('swapMenu')} disabled={state.team.length < 2} />
             <RetroCard icon="●" title="Catch" sub={trainerName ? 'Trainer Pokémon' : "Throw a ball"} accent="#e85050" onClick={openCatch} disabled={!!trainerName} />
             <RetroCard icon="🍓" title="Berry" sub={`×${state.inventory.berry} left`} accent="#ec5f9b" onClick={handleUseBerry} />
             <RetroCard icon="🏃" title="Run" sub="Flee battle" accent="#9ca3af" onClick={handleFlee} />
+          </div>
+        )}
+
+        {phase === 'swapMenu' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: 10, color: '#f0c050', fontSize: 13, fontWeight: 'bold', letterSpacing: '1px' }}>
+              CHOOSE A POKÉMON
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, maxWidth: 900, margin: '0 auto' }}>
+              {state.team.map((m, i) => {
+                ensureMemberHp(m, level);
+                const isActive = i === 0;
+                const fainted = (m.hp ?? 0) <= 0;
+                const max = m.maxHp ?? memberMaxHp(m, level);
+                const pct = Math.max(0, ((m.hp ?? 0) / max) * 100);
+                const c = pct > 50 ? '#7dd87d' : pct > 20 ? '#f0c050' : '#e85050';
+                return (
+                  <button key={i} disabled={isActive || fainted} onClick={() => pickSwap(i)} style={{
+                    background: '#2a2d33',
+                    border: `2px solid ${isActive ? '#666' : fainted ? '#3a3d44' : '#5ba36f'}`,
+                    borderRadius: 10, padding: '12px',
+                    fontFamily: 'inherit', cursor: (isActive || fainted) ? 'not-allowed' : 'pointer',
+                    opacity: (isActive || fainted) ? 0.45 : 1,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                    color: '#f1ebd6',
+                  }}>
+                    <img src={spriteUrl(m.id)} alt={m.name} style={{ width: 56, height: 56, imageRendering: 'pixelated' }} />
+                    <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
+                    <div style={{ width: '100%', background: '#1a1d21', borderRadius: 4, height: 6 }}>
+                      <div style={{ width: `${pct}%`, background: c, height: '100%', borderRadius: 4 }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: '#9aa0a8' }}>
+                      {isActive ? 'IN BATTLE' : fainted ? 'FAINTED' : `${m.hp}/${max} HP`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: 12 }}>
+              <button onClick={() => setPhase('menu')} style={backBtnStyle}>← Back</button>
+            </div>
           </div>
         )}
 

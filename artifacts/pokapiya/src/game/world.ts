@@ -11,7 +11,8 @@ export const TILE = {
 
 export type TileCode = typeof TILE[keyof typeof TILE];
 
-const SOLID = new Set<TileCode>([TILE.TREE, TILE.WATER, TILE.ROCK]);
+// Rocks are climbable mountains — only trees and water block the player.
+const SOLID = new Set<TileCode>([TILE.TREE, TILE.WATER]);
 export const isSolid = (code: TileCode | undefined) => code !== undefined && SOLID.has(code);
 export const isTallGrass = (code: TileCode | undefined) => code === TILE.TALLGRASS;
 export const isWater = (code: TileCode | undefined) => code === TILE.WATER;

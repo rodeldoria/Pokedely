@@ -52,6 +52,7 @@ interface GameState {
   fishing: { active: boolean; timer: number } | null;
   state: TrainerState;
   lastTime: number;
+  doorArmed: boolean;
 }
 
 interface Props {
@@ -113,6 +114,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       fishing: null,
       state: trainerState,
       lastTime: 0,
+      doorArmed: true,
     };
     gsRef.current = gs;
 
@@ -384,10 +386,14 @@ function update(
 
   if (gs.toast) { gs.toast.timer -= dt; if (gs.toast.timer <= 0) gs.toast = null; }
 
-  // Door proximity
+  // Door proximity — must step off the door before it can fire again,
+  // otherwise leaving the Pokémon Center immediately re-opens it.
   const door = features.door;
   const ddx = gs.px - (door.x + 0.5), ddy = gs.py - (door.y + 0.5);
-  if (Math.sqrt(ddx * ddx + ddy * ddy) < 0.7) {
+  const onDoor = Math.sqrt(ddx * ddx + ddy * ddy) < 0.7;
+  if (!onDoor) gs.doorArmed = true;
+  if (onDoor && gs.doorArmed) {
+    gs.doorArmed = false;
     save(gs.state); stateRef.current = gs.state;
     onPokecenter();
   }
