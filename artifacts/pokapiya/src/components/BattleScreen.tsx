@@ -276,13 +276,14 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       return;
     }
     onStateChange({ ...state });
-    // Catch chance: base by rarity, big bonus for low wild HP and right answer, small berry boost, scales DOWN by level
-    const base = wild.rarity === 1 ? 0.55 : wild.rarity === 2 ? 0.40 : 0.25;
+    // Kid-friendly catch chance: high base by rarity, bonus for low wild HP and right answer.
+    // Floor at 0.6 so a correct answer almost always catches a common Pokémon.
+    const base = wild.rarity === 1 ? 0.80 : wild.rarity === 2 ? 0.60 : 0.45;
     const hpFactor = 1 - (wildHp / wildMaxHp);          // 0..1
-    const hpBonus = hpFactor * 0.45;                     // up to +0.45
-    const answerBonus = answeredRight ? 0.18 : 0;
-    const levelPenalty = Math.min(0.2, level * 0.012);
-    const chance = Math.max(0.18, Math.min(0.97, base + hpBonus + answerBonus + berryBoost - levelPenalty));
+    const hpBonus = hpFactor * 0.30;
+    const answerBonus = answeredRight ? 0.20 : 0;
+    const minWhenCorrect = answeredRight ? 0.6 : 0.25;
+    const chance = Math.max(minWhenCorrect, Math.min(0.98, base + hpBonus + answerBonus + berryBoost));
     const didCatch = Math.random() < chance;
     setTimeout(() => {
       setShaking(false);
@@ -319,28 +320,40 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     setTimeout(() => setFeedback(''), 1400);
   }
 
-  function pickSwap(idx: number) {
-    // Only legal from the swap menu (defensive — UI also gates this)
+  // Source can be "team" (swap two roster spots) or "box" (pull from PC, demote lead to box).
+  function pickSwap(source: 'team' | 'box', idx: number) {
     if (phase !== 'swapMenu' && phase !== 'menu') return;
-    if (idx === 0 || !state.team[idx]) return;
-    const target = state.team[idx];
+    const pool = source === 'team' ? state.team : state.box;
+    if (!pool[idx]) return;
+    if (source === 'team' && idx === 0) return;
+    const target = pool[idx];
     ensureMemberHp(target, level);
     if ((target.hp ?? 0) <= 0) {
       setFeedback(`${target.name} has no energy left!`);
       setTimeout(() => setFeedback(''), 1400);
       return;
     }
-    // Swap into lead slot and invalidate any queued enemy-turn timers
-    const newTeam = [...state.team];
-    [newTeam[0], newTeam[idx]] = [newTeam[idx], newTeam[0]];
-    state.team = newTeam;
+    if (source === 'team') {
+      const newTeam = [...state.team];
+      [newTeam[0], newTeam[idx]] = [newTeam[idx], newTeam[0]];
+      state.team = newTeam;
+    } else {
+      // Pull from box into lead; previous lead goes into the box.
+      const newBox = [...state.box];
+      const newTeam = [...state.team];
+      const previousLead = newTeam[0];
+      newTeam[0] = newBox.splice(idx, 1)[0];
+      if (previousLead) newBox.push(previousLead);
+      state.team = newTeam;
+      state.box = newBox;
+    }
     turnToken.current += 1;
     onStateChange({ ...state });
-    setMyHpDisplay(newTeam[0].hp ?? newTeam[0].maxHp ?? 0);
-    setLog(`Go, ${newTeam[0].name}!`);
+    const newLead = state.team[0];
+    setMyHpDisplay(newLead.hp ?? newLead.maxHp ?? 0);
+    setLog(`Go, ${newLead.name}!`);
     setFeedback('');
     setPhase('enemyTurn');
-    // Opponent gets a free turn after swap
     setTimeout(() => enemyTurn(), 700);
   }
 
@@ -466,15 +479,24 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       <div style={{
         background: '#1d1f24', padding: '16px 24px', minHeight: 180,
       }}>
-        {phase === 'menu' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, maxWidth: 1100, margin: '0 auto' }}>
-            <RetroCard icon="⚔️" title="Fight" sub="Use a move" accent="#e85050" onClick={() => setPhase('fightMenu')} />
-            <RetroCard icon="🔄" title="Swap" sub={state.team.length > 1 ? `${state.team.length} on team` : 'Need 2+'} accent="#5ba36f" onClick={() => setPhase('swapMenu')} disabled={state.team.length < 2} />
-            <RetroCard icon="●" title="Catch" sub={trainerName ? 'Trainer Pokémon' : "Throw a ball"} accent="#e85050" onClick={openCatch} disabled={!!trainerName} />
-            <RetroCard icon="🍓" title="Berry" sub={`×${state.inventory.berry} left`} accent="#ec5f9b" onClick={handleUseBerry} />
-            <RetroCard icon="🏃" title="Run" sub="Flee battle" accent="#9ca3af" onClick={handleFlee} />
-          </div>
-        )}
+        {phase === 'menu' && (() => {
+          // Anyone alive besides the current lead — team or box.
+          const swapPartners =
+            state.team.slice(1).filter(m => { ensureMemberHp(m, level); return (m.hp ?? 0) > 0; }).length +
+            state.box.filter(m => { ensureMemberHp(m, level); return (m.hp ?? 0) > 0; }).length;
+          const swapSub = swapPartners > 0
+            ? `${swapPartners} ready`
+            : (state.team.length + state.box.length) > 1 ? 'All fainted' : 'Catch more!';
+          return (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12, maxWidth: 1100, margin: '0 auto' }}>
+              <RetroCard icon="⚔️" title="Fight" sub="Use a move" accent="#e85050" onClick={() => setPhase('fightMenu')} />
+              <RetroCard icon="🔄" title="Swap" sub={swapSub} accent="#5ba36f" onClick={() => setPhase('swapMenu')} disabled={swapPartners === 0} />
+              <RetroCard icon="●" title="Catch" sub={trainerName ? 'Trainer Pokémon' : "Throw a ball"} accent="#e85050" onClick={openCatch} disabled={!!trainerName} />
+              <RetroCard icon="🍓" title="Berry" sub={`×${state.inventory.berry} left`} accent="#ec5f9b" onClick={handleUseBerry} />
+              <RetroCard icon="🏃" title="Run" sub="Flee battle" accent="#9ca3af" onClick={handleFlee} />
+            </div>
+          );
+        })()}
 
         {phase === 'swapMenu' && (
           <div>
@@ -490,7 +512,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
                 const pct = Math.max(0, ((m.hp ?? 0) / max) * 100);
                 const c = pct > 50 ? '#7dd87d' : pct > 20 ? '#f0c050' : '#e85050';
                 return (
-                  <button key={i} disabled={isActive || fainted} onClick={() => pickSwap(i)} style={{
+                  <button key={`t${i}`} disabled={isActive || fainted} onClick={() => pickSwap('team', i)} style={{
                     background: '#2a2d33',
                     border: `2px solid ${isActive ? '#666' : fainted ? '#3a3d44' : '#5ba36f'}`,
                     borderRadius: 10, padding: '12px',
@@ -511,6 +533,44 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
                 );
               })}
             </div>
+
+            {state.box.length > 0 && (
+              <>
+                <div style={{ textAlign: 'center', margin: '14px 0 8px', color: '#90c4d8', fontSize: 12, fontWeight: 'bold', letterSpacing: '1px' }}>
+                  FROM PC BOX (sends current Pokémon to box)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, maxWidth: 900, margin: '0 auto' }}>
+                  {state.box.map((m, i) => {
+                    ensureMemberHp(m, level);
+                    const fainted = (m.hp ?? 0) <= 0;
+                    const max = m.maxHp ?? memberMaxHp(m, level);
+                    const pct = Math.max(0, ((m.hp ?? 0) / max) * 100);
+                    const c = pct > 50 ? '#7dd87d' : pct > 20 ? '#f0c050' : '#e85050';
+                    return (
+                      <button key={`b${i}`} disabled={fainted} onClick={() => pickSwap('box', i)} style={{
+                        background: '#22272e',
+                        border: `2px solid ${fainted ? '#3a3d44' : '#5b8aa3'}`,
+                        borderRadius: 10, padding: '12px',
+                        fontFamily: 'inherit', cursor: fainted ? 'not-allowed' : 'pointer',
+                        opacity: fainted ? 0.45 : 1,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                        color: '#f1ebd6',
+                      }}>
+                        <img src={spriteUrl(m.id)} alt={m.name} style={{ width: 56, height: 56, imageRendering: 'pixelated' }} />
+                        <div style={{ fontWeight: 'bold', fontSize: 14 }}>{m.name}</div>
+                        <div style={{ width: '100%', background: '#1a1d21', borderRadius: 4, height: 6 }}>
+                          <div style={{ width: `${pct}%`, background: c, height: '100%', borderRadius: 4 }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: '#9aa0a8' }}>
+                          {fainted ? 'FAINTED' : `${m.hp}/${max} HP`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
             <div style={{ textAlign: 'center', marginTop: 12 }}>
               <button onClick={() => setPhase('menu')} style={backBtnStyle}>← Back</button>
             </div>
