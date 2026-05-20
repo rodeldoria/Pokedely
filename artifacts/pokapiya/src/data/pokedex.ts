@@ -112,6 +112,38 @@ export function byId(id: number): Pokemon | null {
   return { id: row[0], name: row[1], types: row[2], rarity: row[3] };
 }
 
+// Classic early-Kanto Route 1 / Viridian Forest spawn table.
+// Common: Pidgey, Rattata, Caterpie, Weedle. Uncommon: Pikachu, Nidoran, Bellsprout, Oddish.
+// Rare cameos: Eevee, Clefairy, Jigglypuff, starters in the wild.
+const EARLY_KANTO_SPAWNS: { id: number; weight: number }[] = [
+  { id: 16, weight: 22 }, // Pidgey
+  { id: 19, weight: 22 }, // Rattata
+  { id: 10, weight: 16 }, // Caterpie
+  { id: 13, weight: 16 }, // Weedle
+  { id: 21, weight: 10 }, // Spearow
+  { id: 25, weight: 6 },  // Pikachu (uncommon)
+  { id: 29, weight: 5 },  // Nidoran-f
+  { id: 32, weight: 5 },  // Nidoran-m
+  { id: 43, weight: 5 },  // Oddish
+  { id: 69, weight: 5 },  // Bellsprout
+  { id: 39, weight: 3 },  // Jigglypuff
+  { id: 35, weight: 3 },  // Clefairy
+  { id: 133, weight: 2 }, // Eevee (rare)
+  { id: 1,  weight: 1 },  // Bulbasaur (very rare)
+  { id: 4,  weight: 1 },  // Charmander (very rare)
+  { id: 7,  weight: 1 },  // Squirtle (very rare)
+];
+
+export function pickEarlyKanto(): Pokemon {
+  const total = EARLY_KANTO_SPAWNS.reduce((s, e) => s + e.weight, 0);
+  let r = Math.random() * total;
+  for (const e of EARLY_KANTO_SPAWNS) {
+    r -= e.weight;
+    if (r <= 0) return byId(e.id) || byId(16)!;
+  }
+  return byId(16)!;
+}
+
 export function pickRandom(): Pokemon {
   const weights = KANTO.map(p => ({ tier: p[3], row: p }));
   const totalWeight = weights.reduce((s, w) => s + (w.tier === 1 ? 5 : w.tier === 2 ? 2 : 1), 0);

@@ -119,6 +119,10 @@ export default function App() {
           state={trainerState}
           onTeam={() => setScreen('team')}
           onPokedex={() => setScreen('pokedex')}
+          onSave={() => {
+            save(trainerState);
+            showToast('💾 Game saved!');
+          }}
           toast={toast}
         />
       )}

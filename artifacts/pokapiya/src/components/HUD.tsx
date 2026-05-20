@@ -4,10 +4,11 @@ interface Props {
   state: TrainerState;
   onTeam: () => void;
   onPokedex: () => void;
+  onSave: () => void;
   toast: string;
 }
 
-export default function HUD({ state, onTeam, onPokedex, toast }: Props) {
+export default function HUD({ state, onTeam, onPokedex, onSave, toast }: Props) {
   const total = state.stats.correct + state.stats.wrong;
   const acc = total > 0 ? Math.round((state.stats.correct / total) * 100) : 100;
   const level = getLevel(state);
@@ -51,6 +52,7 @@ export default function HUD({ state, onTeam, onPokedex, toast }: Props) {
 
         <button onClick={onPokedex} style={btnStyle('#5a73c4')}>📕 Pokédex (P)</button>
         <button onClick={onTeam} style={btnStyle('#d63946')}>👥 Team (T)</button>
+        <button onClick={onSave} style={btnStyle('#2d8a52')}>💾 Save</button>
       </div>
 
       <div style={{

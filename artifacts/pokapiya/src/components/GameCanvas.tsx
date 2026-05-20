@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { TILE, generateMap, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, type TileCode, type WorldMap, type NPCTrainer } from '../game/world';
-import { spriteUrl, pickRandom, byId, pickByType, type Pokemon } from '../data/pokedex';
+import { spriteUrl, pickRandom, pickEarlyKanto, byId, pickByType, type Pokemon } from '../data/pokedex';
 import { save, recordEncounter, takeItem, cutTree, type TrainerState } from '../game/save';
 
 const TS = 32;
@@ -10,14 +10,15 @@ const SPEED = 3.5;
 const JUMP_VEL = -9;
 const GRAVITY = 22;
 
+// Early-Kanto roaming Pokémon — Route 1 / Viridian Forest vibe
 const AMBIENT = [
-  { id: 25, sx: 20, sy: 10, greet: "Pika pika! ⚡" },
-  { id: 1,  sx: 36, sy: 14, greet: "Bulba! Bulbasaur! 🌿" },
-  { id: 7,  sx: 12, sy: 28, greet: "Squirtle squirt! 💧" },
-  { id: 4,  sx: 42, sy: 8,  greet: "Char char! 🔥" },
+  { id: 16, sx: 20, sy: 10, greet: "Pidgey! 🪶" },
+  { id: 19, sx: 36, sy: 14, greet: "Rattata rat! 🐭" },
+  { id: 10, sx: 12, sy: 28, greet: "Caterpie! 🐛" },
+  { id: 13, sx: 42, sy: 8,  greet: "Weedle! 🐝" },
+  { id: 25, sx: 30, sy: 24, greet: "Pika pika! ⚡" },
   { id: 129,sx: 10, sy: 32, greet: "Karp karp! 🐟" },
-  { id: 35, sx: 30, sy: 24, greet: "Cleffa! Clefairy! ✨" },
-  { id: 39, sx: 16, sy: 20, greet: "Jigglypuff! 🎵" },
+  { id: 133,sx: 16, sy: 20, greet: "Eevee! 🦊" },
 ];
 
 interface AmbientMon {
@@ -354,7 +355,7 @@ function update(
       if (Math.random() < 0.22) {
         gs.encounterCooldown = 1.8;
         const biasedId = gs.biasMonId;
-        const wild = (biasedId && Math.random() < 0.7) ? (byId(biasedId) || pickRandom()) : pickRandom();
+        const wild = (biasedId && Math.random() < 0.7) ? (byId(biasedId) || pickEarlyKanto()) : pickEarlyKanto();
         recordEncounter(gs.state, wild);
         stateRef.current = gs.state;
         save(gs.state);
