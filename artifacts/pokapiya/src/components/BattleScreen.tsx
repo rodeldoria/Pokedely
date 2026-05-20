@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Pokemon } from '../data/pokedex';
 import { displayName, spriteUrl, backSpriteUrl } from '../data/pokedex';
 import { questionFor } from '../data/stem';
+import { AddieSprite } from './AddieSprite';
 import {
   recordAnswer, recordCatch, useBall, useBerry, getLevel,
   ensureMemberHp, memberMaxHp, xpToNextLevel,
@@ -88,7 +89,7 @@ function calcDamage(move: Move, defenderTypes: string[], level: number): number 
   return Math.max(2, Math.round((base + variance) * eff));
 }
 
-type Phase = 'appear' | 'menu' | 'fightMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
+type Phase = 'sendOut' | 'appear' | 'menu' | 'fightMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
 
 export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward }: Props) {
   const level = getLevel(state);
@@ -99,11 +100,12 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const [wildHp, setWildHp] = useState(wildMaxHp);
   const [myHpDisplay, setMyHpDisplay] = useState(myMember?.hp ?? 0);
 
-  const [phase, setPhase] = useState<Phase>('appear');
+  const [phase, setPhase] = useState<Phase>('sendOut');
   const [question, setQuestion] = useState(() => questionFor(wild, level));
   const [attemptsLeft, setAttemptsLeft] = useState(5);
   const [berryBoost, setBerryBoost] = useState(0);
-  const [log, setLog] = useState(trainerName ? `${trainerName} sent out ${displayName(wild)}!` : `A wild ${displayName(wild)} appeared!`);
+  const introMsg = trainerName ? `${trainerName} sent out ${displayName(wild)}!` : `A wild ${displayName(wild)} appeared!`;
+  const [log, setLog] = useState(introMsg);
   const [feedback, setFeedback] = useState('');
   const [shaking, setShaking] = useState(false);
   const [wildHurt, setWildHurt] = useState(false);
@@ -124,9 +126,15 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   }
 
   useEffect(() => {
-    const t = setTimeout(() => setMonVisible(true), 100);
-    const t2 = setTimeout(() => setPhase('menu'), 900);
-    return () => { clearTimeout(t); clearTimeout(t2); };
+    // sendOut intro (Addie vs opponent VS screen) → appear (Pokémon out) → menu
+    const t1 = setTimeout(() => {
+      setPhase('appear');
+      setMonVisible(true);
+      if (myMember) setLog(`Go, ${myMember.name}!`);
+    }, 1800);
+    const t2 = setTimeout(() => setPhase('menu'), 2700);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -316,6 +324,13 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
       fontFamily: '"Courier New", ui-monospace, monospace',
       letterSpacing: '0.5px',
     }}>
+      {phase === 'sendOut' && (
+        <SendOutIntro
+          message={introMsg}
+          addieLevel={level}
+          wild={wild}
+        />
+      )}
       {/* ── Grass arena ──────────────────────────────────── */}
       <div style={{
         position: 'relative', flex: '1 1 55%', minHeight: 280,
@@ -570,6 +585,66 @@ function RetroHpCard({
           <div style={{ width: `${xpPct}%`, height: '100%', background: '#5b8aff', transition: 'width 0.4s' }} />
         </div>
       )}
+    </div>
+  );
+}
+
+function SendOutIntro({ message, addieLevel, wild }: {
+  message: string; addieLevel: number; wild: Pokemon;
+}) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, zIndex: 10,
+      background: 'radial-gradient(ellipse at center, #6a2a5a 0%, #2a1428 80%)',
+      display: 'flex', flexDirection: 'column',
+      fontFamily: '"Courier New", monospace',
+      animation: 'fadeIn 0.25s ease-out',
+    }}>
+      {/* Banner */}
+      <div style={{
+        padding: '14px 24px',
+        background: 'rgba(20,10,24,0.55)',
+        borderBottom: '2px solid rgba(255,213,74,0.3)',
+      }}>
+        <div style={{ color: '#ffd54a', fontWeight: 'bold', fontSize: 22, letterSpacing: '1px' }}>
+          {message}
+        </div>
+        <div style={{ color: '#e0d4c0', fontSize: 12, marginTop: 4, letterSpacing: '1px' }}>
+          {wild.types[0].toUpperCase()} · Rarity {'★'.repeat(wild.rarity)} · Addie Lv. {addieLevel}
+        </div>
+      </div>
+      {/* VS arena */}
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-around',
+        padding: '0 60px', position: 'relative',
+      }}>
+        <div style={{ textAlign: 'center', animation: 'slideInLeft 0.5s ease-out' }}>
+          <AddieSprite size={180} facing="right" />
+          <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
+            Addie · Lv. {addieLevel}
+          </div>
+          <div style={{ color: '#7dd87d', fontSize: 18, marginTop: 2 }}>● ●</div>
+        </div>
+        <div style={{
+          color: 'rgba(255,255,255,0.55)', fontSize: 56, fontWeight: 'bold',
+          letterSpacing: '4px', textShadow: '0 4px 0 rgba(0,0,0,0.4)',
+          animation: 'popIn 0.4s ease-out 0.2s both',
+        }}>VS</div>
+        <div style={{ textAlign: 'center', animation: 'slideInRight 0.5s ease-out' }}>
+          <img src={spriteUrl(wild.id)} alt={displayName(wild)} style={{
+            width: 180, height: 180, imageRendering: 'pixelated',
+            filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.35)) drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
+          }} />
+          <div style={{ color: '#ffd54a', fontSize: 16, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
+            {displayName(wild)}
+          </div>
+        </div>
+      </div>
+      <style>{`
+        @keyframes slideInLeft { from { transform: translateX(-60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
     </div>
   );
 }
