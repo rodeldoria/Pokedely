@@ -55,6 +55,10 @@ interface GameState {
   doorArmed: boolean;
 }
 
+export interface GameCanvasController {
+  exitPokecenter: () => void;
+}
+
 interface Props {
   active: boolean;
   onEncounter: (wild: Pokemon, biasId: number | null) => void;
@@ -62,9 +66,10 @@ interface Props {
   onPokecenter: () => void;
   onToast: (msg: string) => void;
   stateRef: React.MutableRefObject<TrainerState>;
+  controllerRef?: React.MutableRefObject<GameCanvasController | null>;
 }
 
-export default function GameCanvas({ active, onEncounter, onTrainerEncounter, onPokecenter, onToast, stateRef }: Props) {
+export default function GameCanvas({ active, onEncounter, onTrainerEncounter, onPokecenter, onToast, stateRef, controllerRef }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gsRef = useRef<GameState | null>(null);
   const rafRef = useRef<number>(0);
@@ -170,6 +175,39 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
   }, []);
 
   useEffect(() => { if (gsRef.current) gsRef.current.state = stateRef.current; });
+
+  // Expose imperative controls so the Pokémon Center close handler can
+  // nudge the player off the door tile (otherwise they'd have to walk
+  // off manually before the door becomes interactable again).
+  useEffect(() => {
+    if (!controllerRef) return;
+    controllerRef.current = {
+      exitPokecenter: () => {
+        const gs = gsRef.current;
+        if (!gs) return;
+        const door = gs.worldMap.features.door;
+        const { map, width, height } = gs.worldMap;
+        // Try south, then east/west/north — first non-solid wins.
+        const candidates: Array<[number, number]> = [
+          [door.x, door.y + 1],
+          [door.x + 1, door.y],
+          [door.x - 1, door.y],
+          [door.x, door.y - 1],
+        ];
+        for (const [cx, cy] of candidates) {
+          if (cx < 0 || cy < 0 || cx >= width || cy >= height) continue;
+          const t = map[cy]?.[cx];
+          if (t !== undefined && !isSolid(t)) {
+            gs.px = cx + 0.5;
+            gs.py = cy + 0.5;
+            gs.doorArmed = false; // require step-off before re-trigger
+            return;
+          }
+        }
+      },
+    };
+    return () => { if (controllerRef) controllerRef.current = null; };
+  }, [controllerRef]);
 
   return (
     <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H}

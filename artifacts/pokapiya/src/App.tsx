@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import GameCanvas from './components/GameCanvas';
+import GameCanvas, { type GameCanvasController } from './components/GameCanvas';
 import BattleScreen from './components/BattleScreen';
 import TeamModal from './components/TeamModal';
 import PokeCenterModal from './components/PokeCenterModal';
@@ -29,6 +29,7 @@ export default function App() {
   const [currentTrainer, setCurrentTrainer] = useState<NPCTrainer | null>(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gameRef = useRef<GameCanvasController | null>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -78,6 +79,8 @@ export default function App() {
   }, []);
 
   const handlePokecenterClose = useCallback(() => {
+    // Nudge the player off the door tile so the center doesn't immediately re-open.
+    gameRef.current?.exitPokecenter();
     setScreen('world');
     showToast('All healed up! Got 3 Poké Balls + 1 Berry! 🌟');
     forceUpdate(n => n + 1);
@@ -112,6 +115,7 @@ export default function App() {
         onPokecenter={handlePokecenter}
         onToast={showToast}
         stateRef={stateRef}
+        controllerRef={gameRef}
       />
 
       {screen === 'world' && (
