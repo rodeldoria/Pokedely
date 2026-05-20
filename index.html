@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1f1f1f" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Pokapiya — STEM Adventure</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #0e1116; height: 100%; overflow: hidden; }
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: 'Trebuchet MS', system-ui, sans-serif;
+        color: #f4f4f4;
+      }
+      #game { width: 100vw; height: 100vh; }
+      .splash {
+        position: fixed; inset: 0;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: radial-gradient(circle at 50% 30%, #234, #0e1116 70%);
+        z-index: 5;
+        transition: opacity .6s ease;
+      }
+      .splash h1 { font-size: 3rem; margin: 0; color: #ffd54a; text-shadow: 0 4px 0 #c33; }
+      .splash p  { margin: .4rem 0; opacity: .85; }
+      .splash.hidden { opacity: 0; pointer-events: none; }
+    </style>
+    <script type="module" crossorigin src="./assets/index-lZ-xBk-r.js"></script>
+  </head>
+  <body>
+    <div id="splash" class="splash">
+      <h1>Pokapiya</h1>
+      <p>A STEM adventure — loading the world…</p>
+    </div>
+    <div id="game"></div>
+  </body>
+</html>
