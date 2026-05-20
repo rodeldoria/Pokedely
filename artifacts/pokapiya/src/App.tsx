@@ -238,6 +238,14 @@ export default function App() {
           onPC={() => setScreen('pc')}
         />
       )}
+
+      {evoPending && screen === 'world' && (
+        <EvolutionModal
+          pending={evoPending}
+          onEvolve={handleEvolveConfirm}
+          onCancel={handleEvolveCancel}
+        />
+      )}
     </div>
   );
 }

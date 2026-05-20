@@ -88,6 +88,11 @@ interface GameState {
   lastTime: number;
   doorArmed: boolean;
   switchZone?: (newId: ZoneId, fromSide: Side) => void;
+  // Recent player positions, sampled each frame. The follower (primary
+  // team Pokémon) reads from N frames ago so it trails behind Addie.
+  posHistory: { x: number; y: number; facing: GameState['facing'] }[];
+  followerImg: HTMLImageElement | null;
+  followerId: number | null;
 }
 
 export interface GameCanvasController {
@@ -155,6 +160,9 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       state: trainerState,
       lastTime: 0,
       doorArmed: true,
+      posHistory: [],
+      followerImg: null,
+      followerId: null,
     };
     gsRef.current = gs;
 
@@ -181,6 +189,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       gs.lastTileKey = '';
       gs.doorArmed = false;
       gs.speech = null;
+      gs.posHistory = [];
       loadEntitySprites();
       setZone(gs.state, newId);
       stateRef.current = gs.state;
@@ -366,6 +375,31 @@ function update(
   npx = Math.max(0.5, Math.min(width - 0.5, npx));
   npy = Math.max(0.5, Math.min(height - 0.5, npy));
   gs.px = npx; gs.py = npy;
+
+  // Track recent positions so the primary-team Pokémon can follow Addie.
+  gs.posHistory.push({ x: gs.px, y: gs.py, facing: gs.facing });
+  if (gs.posHistory.length > 64) gs.posHistory.shift();
+
+  // Keep the follower sprite in sync with the player's primary team member.
+  const primary = gs.state.team[0];
+  if (primary) {
+    if (gs.followerId !== primary.id) {
+      gs.followerId = primary.id;
+      gs.followerImg = null;
+      const url = spriteUrl(primary.id);
+      const cached = gs.images.get(url);
+      if (cached) gs.followerImg = cached;
+      else {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => { gs.images.set(url, img); if (gs.followerId === primary.id) gs.followerImg = img; };
+        img.src = url;
+      }
+    }
+  } else {
+    gs.followerId = null;
+    gs.followerImg = null;
+  }
 
   const targetCamX = gs.px * TS - CANVAS_W / 2;
   const targetCamY = gs.py * TS - CANVAS_H / 2;
@@ -583,6 +617,25 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   const psx = gs.px * TS - camX;
   const psy = gs.py * TS - camY + gs.pz * 2;
   sprites.push({ y: gs.py, draw: () => drawPlayer(ctx, psx, psy, gs.facing, gs.walkFrame) });
+
+  // Follower: the primary team Pokémon trails Addie by ~14 frames.
+  if (gs.followerImg && gs.posHistory.length > 14) {
+    const trail = gs.posHistory[gs.posHistory.length - 15];
+    const fsx = trail.x * TS - camX;
+    const fsy = trail.y * TS - camY;
+    const bob = Math.sin(Date.now() / 220) * 1.5;
+    const img = gs.followerImg;
+    sprites.push({
+      y: trail.y - 0.01,
+      draw: () => {
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.ellipse(fsx, fsy + 9, 9, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.drawImage(img, fsx - 14, fsy - 18 + bob, 28, 28);
+      }
+    });
+  }
 
   sprites.sort((a, b) => a.y - b.y);
   for (const s of sprites) s.draw();
