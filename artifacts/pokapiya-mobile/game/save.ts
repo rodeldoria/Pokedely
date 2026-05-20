@@ -28,7 +28,7 @@ export interface TrainerState {
   box: PartyMember[];
   pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
   stats: { correct: number; wrong: number; caught: number; encounters: number };
-  inventory: { pokeball: number; berry: number; cut: number; rod: number };
+  inventory: { pokeball: number; berry: number; cut: number; rod: number; potion: number };
   worldItems: Record<string, boolean>;
   cutTrees: Record<string, boolean>;
   defeatedTrainers: Record<string, boolean>;
@@ -47,7 +47,7 @@ export const emptyState = (): TrainerState => ({
   box: [],
   pokedex: {},
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
-  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0 },
+  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0, potion: 3 },
   worldItems: {},
   cutTrees: {},
   defeatedTrainers: {},
@@ -141,6 +141,31 @@ export function useBerryMut(state: TrainerState): boolean {
   return true;
 }
 
+export const POTION_HEAL = 30;
+
+export function usePotionMut(state: TrainerState): number {
+  if ((state.inventory.potion || 0) <= 0) return 0;
+  const lead = state.team[0];
+  if (!lead) return 0;
+  const max = lead.maxHp ?? memberMaxHp(lead, getLevel(state));
+  const before = lead.hp ?? max;
+  if (before >= max) return 0;
+  const after = Math.min(max, before + POTION_HEAL);
+  lead.hp = after;
+  state.inventory.potion -= 1;
+  return after - before;
+}
+
+export function switchLeadMut(state: TrainerState, index: number): boolean {
+  if (index <= 0 || index >= state.team.length) return false;
+  const target = state.team[index];
+  if (!target || (target.hp ?? 0) <= 0) return false;
+  const lead = state.team[0];
+  state.team[0] = target;
+  state.team[index] = lead;
+  return true;
+}
+
 export function healTeamMut(state: TrainerState) {
   const lvl = getLevel(state);
   for (const m of state.team) {
@@ -153,6 +178,7 @@ export function healAtCenterMut(state: TrainerState) {
   state.visitedCenter += 1;
   state.inventory.pokeball += 3;
   state.inventory.berry += 1;
+  state.inventory.potion += 2;
   healTeamMut(state);
 }
 

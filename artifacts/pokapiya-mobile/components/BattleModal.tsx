@@ -25,8 +25,10 @@ import {
   recordAnswerMut,
   recordCatchMut,
   recordEncounterMut,
+  switchLeadMut,
   useBallMut,
   useBerryMut,
+  usePotionMut,
 } from '../game/save';
 import type { PartyMember } from '../game/save';
 
@@ -97,7 +99,7 @@ function calcDamage(move: Move, defenderTypes: string[], level: number): number 
   return Math.max(2, Math.round((base + variance) * effectiveness(move.type, defenderTypes)));
 }
 
-type Phase = 'menu' | 'fight' | 'question' | 'throwing' | 'result';
+type Phase = 'menu' | 'fight' | 'bag' | 'switch' | 'question' | 'throwing' | 'result';
 
 export function BattleModal({ wild: wildProp, trainerName, onClose }: Props) {
   const colors = useColors();
@@ -316,6 +318,11 @@ export function BattleModal({ wild: wildProp, trainerName, onClose }: Props) {
   }
 
   function handleBerry() {
+    if (isTrainerBattle) {
+      setFeedback("That trainer's Pokémon won't eat your berry!");
+      setTimeout(() => setFeedback(''), 1400);
+      return;
+    }
     let ok = false;
     update((s) => {
       ok = useBerryMut(s);
@@ -328,6 +335,50 @@ export function BattleModal({ wild: wildProp, trainerName, onClose }: Props) {
     setBerryBoost((b) => b + 0.18);
     setFeedback('🍓 You fed it a Berry — it likes you more!');
     setTimeout(() => setFeedback(''), 1400);
+  }
+
+  function handlePotion() {
+    if (!myMember) return;
+    let healed = 0;
+    update((s) => {
+      healed = usePotionMut(s);
+    });
+    if (healed <= 0) {
+      const oof = (state.inventory.potion || 0) <= 0
+        ? 'Out of Potions! Visit the Pokémon Center.'
+        : `${myMember.name} is already at full HP!`;
+      setFeedback(oof);
+      setTimeout(() => setFeedback(''), 1400);
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    const refreshed = (state.team[0]?.hp ?? myHp) + healed;
+    setMyHp(Math.min(myMaxHp, refreshed));
+    setLog(`You used a Potion! ${myMember.name} restored ${healed} HP.`);
+    setFeedback('');
+    setPhase('throwing');
+    setTimeout(() => enemyTurn(), 700);
+  }
+
+  function handleSwitch(targetIdx: number) {
+    if (targetIdx === 0) return;
+    let ok = false;
+    update((s) => {
+      ok = switchLeadMut(s, targetIdx);
+    });
+    if (!ok) {
+      setFeedback("That Pokémon can't battle right now.");
+      setTimeout(() => setFeedback(''), 1400);
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    const newLead = state.team[targetIdx];
+    const nextHp = newLead?.hp ?? myMaxHp;
+    setMyHp(nextHp);
+    setLog(`Go, ${newLead?.name}! Take the field!`);
+    setFeedback('');
+    setPhase('throwing');
+    setTimeout(() => enemyTurn(), 700);
   }
 
   function handleFlee() {
@@ -407,22 +458,21 @@ export function BattleModal({ wild: wildProp, trainerName, onClose }: Props) {
                   accent={colors.primary}
                 />
                 <RetroButton
-                  title="Catch"
-                  subtitle={isTrainerBattle ? 'Trainers only' : `${state.inventory.pokeball} balls`}
-                  icon={<Feather name="target" size={22} color={colors.accent} />}
-                  onPress={openCatch}
+                  title="Bag"
+                  subtitle={`Potions ${state.inventory.potion}`}
+                  icon={<Feather name="package" size={22} color={colors.accent} />}
+                  onPress={() => setPhase('bag')}
                   accent={colors.accent}
-                  disabled={isTrainerBattle || state.inventory.pokeball <= 0}
                 />
               </View>
               <View style={styles.row}>
                 <RetroButton
-                  title="Berry"
-                  subtitle={`×${state.inventory.berry} left`}
-                  icon={<Feather name="heart" size={22} color="#ec5f9b" />}
-                  onPress={handleBerry}
-                  accent="#ec5f9b"
-                  disabled={isTrainerBattle}
+                  title="Switch"
+                  subtitle={`${state.team.length} on team`}
+                  icon={<Feather name="repeat" size={22} color="#7dd87d" />}
+                  onPress={() => setPhase('switch')}
+                  accent="#7dd87d"
+                  disabled={state.team.length <= 1}
                 />
                 <RetroButton
                   title="Run"
@@ -434,6 +484,97 @@ export function BattleModal({ wild: wildProp, trainerName, onClose }: Props) {
                 />
               </View>
             </View>
+          )}
+
+          {phase === 'bag' && (
+            <View style={styles.grid2x2}>
+              <View style={styles.row}>
+                <RetroButton
+                  title="Potion"
+                  subtitle={`×${state.inventory.potion} · +${30} HP`}
+                  icon={<Feather name="plus-square" size={22} color="#7dd87d" />}
+                  onPress={handlePotion}
+                  accent="#7dd87d"
+                  disabled={state.inventory.potion <= 0}
+                />
+                <RetroButton
+                  title="Poké Ball"
+                  subtitle={isTrainerBattle ? 'Trainers only' : `×${state.inventory.pokeball}`}
+                  icon={<Feather name="target" size={22} color={colors.accent} />}
+                  onPress={openCatch}
+                  accent={colors.accent}
+                  disabled={isTrainerBattle || state.inventory.pokeball <= 0}
+                />
+              </View>
+              <View style={styles.row}>
+                <RetroButton
+                  title="Berry"
+                  subtitle={isTrainerBattle ? 'Wild only' : `×${state.inventory.berry} catch boost`}
+                  icon={<Feather name="heart" size={22} color="#ec5f9b" />}
+                  onPress={handleBerry}
+                  accent="#ec5f9b"
+                  disabled={isTrainerBattle || state.inventory.berry <= 0}
+                />
+                <RetroButton
+                  title="Back"
+                  subtitle="To menu"
+                  icon={<Feather name="arrow-left" size={22} color={colors.mutedForeground} />}
+                  onPress={() => setPhase('menu')}
+                  accent={colors.mutedForeground}
+                />
+              </View>
+            </View>
+          )}
+
+          {phase === 'switch' && (
+            <ScrollView contentContainerStyle={{ paddingBottom: 12 }}>
+              <Text style={[styles.qMeta, { color: colors.accent }]}>
+                CHOOSE A POKÉMON TO SEND IN
+              </Text>
+              <View style={{ gap: 8 }}>
+                {state.team.map((m, i) => {
+                  const fainted = (m.hp ?? 0) <= 0;
+                  const isLead = i === 0;
+                  const disabled = isLead || fainted;
+                  return (
+                    <Pressable
+                      key={'sw_' + i}
+                      onPress={() => !disabled && handleSwitch(i)}
+                      disabled={disabled}
+                      style={({ pressed }) => [
+                        styles.switchRow,
+                        {
+                          backgroundColor: pressed ? colors.secondary : colors.card,
+                          borderColor: isLead ? colors.accent : colors.border,
+                          opacity: disabled && !isLead ? 0.45 : 1,
+                        },
+                      ]}
+                    >
+                      <PokeSprite id={m.id} size={42} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.switchName, { color: colors.foreground }]}>
+                          {m.name}{isLead ? '  (active)' : ''}
+                        </Text>
+                        <Text style={[styles.switchHp, {
+                          color: fainted ? colors.destructive : colors.mutedForeground,
+                        }]}>
+                          HP {m.hp ?? 0} / {m.maxHp ?? 0}
+                          {fainted ? '  — fainted' : ''}
+                        </Text>
+                      </View>
+                      <Text style={{ color: colors.accent, fontWeight: '800', letterSpacing: 1 }}>
+                        {isLead ? '★' : fainted ? '✕' : '→'}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Pressable onPress={() => setPhase('menu')} style={styles.back}>
+                <Text style={{ color: colors.accent, fontSize: 12, letterSpacing: 1 }}>
+                  ← BACK TO MENU
+                </Text>
+              </Pressable>
+            </ScrollView>
           )}
 
           {phase === 'fight' && (
@@ -543,6 +684,12 @@ const styles = StyleSheet.create({
   back: { alignSelf: 'center', marginTop: 12, paddingVertical: 6, paddingHorizontal: 14 },
   qMeta: { textAlign: 'center', fontSize: 11, letterSpacing: 1, fontWeight: '800', marginBottom: 6 },
   qPrompt: { textAlign: 'center', fontSize: 17, fontWeight: '700', marginBottom: 12 },
+  switchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 2, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12,
+  },
+  switchName: { fontSize: 14, fontWeight: '800' },
+  switchHp: { fontSize: 11, fontWeight: '700', marginTop: 2 },
   choices: { gap: 8 },
   choice: { borderWidth: 2, borderRadius: 10, paddingVertical: 14, paddingHorizontal: 14 },
   choiceText: { fontSize: 15, fontWeight: '700' },

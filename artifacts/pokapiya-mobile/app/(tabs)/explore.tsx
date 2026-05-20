@@ -14,7 +14,7 @@ import {
   type MobileTrainer,
 } from '../../game/overworld';
 import {
-  awardRewardMut, defeatTrainerMut, REWARD_LABELS, SPAWN,
+  awardRewardMut, defeatTrainerMut, REWARD_LABELS, SPAWN, saveState,
 } from '../../game/save';
 import { byId, pickEarlyKanto, pickByType } from '../../data/pokedex';
 import type { Pokemon } from '../../data/pokedex';
@@ -149,9 +149,24 @@ export default function ExploreScreen() {
       } else if (result.caught) {
         showToast('✨ A new friend joined your team!');
       }
+      // Explicit autosave after every battle for peace of mind
+      await saveState(state);
     },
-    [activeTrainer, update, showToast],
+    [activeTrainer, update, showToast, state],
   );
+
+  const leaveCenter = useCallback(async () => {
+    setShowCenter(false);
+    // Warp player one tile south off the door so re-entry doesn't loop
+    await update((s) => {
+      const ny = Math.min(WORLD_H - 1, (s.playerPos?.y ?? SPAWN.y) + 1);
+      const nx = s.playerPos?.x ?? SPAWN.x;
+      const tile = WORLD_MAP[ny]?.[nx];
+      if (tile !== undefined && !isSolid(tile) && !isPokeCenter(tile)) {
+        s.playerPos = { x: nx, y: ny };
+      }
+    });
+  }, [update]);
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.background }} />;
 
@@ -332,7 +347,7 @@ export default function ExploreScreen() {
 
       <PokeCenterModal
         visible={showCenter}
-        onClose={() => setShowCenter(false)}
+        onClose={leaveCenter}
         onOpenPC={() => {
           setShowCenter(false);
           setShowPC(true);
