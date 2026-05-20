@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/pokapiya-mobile/"
+title = "Pokapiya Mobile"
+version = "1.0.0"
+id = "artifacts/pokapiya-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/pokapiya-mobile/" ]
+localPort = 26254
+
+[services.development]
+run = "pnpm --filter @workspace/pokapiya-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pokapiya-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/pokapiya-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "26254"
+BASE_PATH = "/pokapiya-mobile/"
