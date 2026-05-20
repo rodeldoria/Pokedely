@@ -631,125 +631,312 @@ function drawAmbientMon(ctx: CanvasRenderingContext2D, a: AmbientMon, sx: number
   if (a.img) ctx.drawImage(a.img, sx - 20, sy - 30, 40, 40);
 }
 
-function drawTrainerNPC(ctx: CanvasRenderingContext2D, t: TrainerNPC, sx: number, sy: number, defeated: boolean) {
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.beginPath(); ctx.ellipse(sx, sy + 14, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
-  // Body
-  const palette: Record<string, [string, string, string]> = {
-    hiker:  ['#a0522d', '#d4a373', '#5a3e1e'],   // brown
-    fisher: ['#1a6b9d', '#ffd54a', '#0e3a5a'],   // blue+yellow
-    camper: ['#2d6a4f', '#f4a261', '#1a3f2e'],   // green+tan
-    bug:    ['#86c544', '#3a6b2d', '#1f3a15'],
-    lass:   ['#ff77aa', '#fff8e1', '#7d2050'],   // pink+cream
-  };
-  const [shirt, accent, hair] = palette[t.kind] || palette.camper;
-  // Head
-  ctx.fillStyle = '#f3c6a5';
-  ctx.beginPath(); ctx.arc(sx, sy - 8, 8, 0, Math.PI * 2); ctx.fill();
-  // Hair
-  ctx.fillStyle = hair;
-  ctx.beginPath(); ctx.arc(sx, sy - 12, 8, Math.PI, 0); ctx.fill();
-  if (t.kind === 'lass') {
-    ctx.beginPath(); ctx.arc(sx - 7, sy - 4, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(sx + 7, sy - 4, 4, 0, Math.PI * 2); ctx.fill();
-  }
-  // Eyes
-  ctx.fillStyle = '#111';
-  ctx.fillRect(sx - 3, sy - 8, 1.5, 2);
-  ctx.fillRect(sx + 1.5, sy - 8, 1.5, 2);
-  // Torso
-  ctx.fillStyle = shirt;
-  ctx.beginPath(); ctx.roundRect(sx - 9, sy - 1, 18, 14, 2); ctx.fill();
-  ctx.fillStyle = accent; ctx.fillRect(sx - 9, sy + 10, 18, 2);
-  // Legs
-  ctx.fillStyle = '#1a1a3e';
-  ctx.fillRect(sx - 8, sy + 12, 7, 8);
-  ctx.fillRect(sx + 1, sy + 12, 7, 8);
-  // Hat
-  if (t.kind === 'hiker') {
-    ctx.fillStyle = '#d63946';
-    ctx.beginPath(); ctx.ellipse(sx, sy - 14, 9, 3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillRect(sx - 5, sy - 18, 10, 4);
-  }
-  if (t.kind === 'fisher') {
-    ctx.fillStyle = '#ffd54a';
-    ctx.beginPath(); ctx.ellipse(sx, sy - 14, 10, 2, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillRect(sx - 5, sy - 17, 10, 3);
-  }
-  if (defeated) {
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    ctx.beginPath(); ctx.arc(sx, sy, 16, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#4ade80'; ctx.font = 'bold 14px "Segoe UI"';
-    ctx.textAlign = 'center'; ctx.fillText('✓', sx, sy + 4);
-  } else {
-    // ! indicator
-    const bob = Math.sin(t.bobTimer * 2) * 2;
-    ctx.fillStyle = '#ffd54a';
-    ctx.beginPath(); ctx.arc(sx + 12, sy - 18 + bob, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#d63946'; ctx.font = 'bold 10px "Segoe UI"';
-    ctx.textAlign = 'center'; ctx.fillText('!', sx + 12, sy - 15 + bob);
+// ─── PIXEL-ART PLAYER ────────────────────────────────────────────────────────
+// 14×20 pixel sprites, scale 2 → 28×40 actual. Feet at (sx, sy).
+const PLAYER_PALETTE: Record<string, string> = {
+  K: '#1a0d00', // outline
+  R: '#d63946', // red
+  r: '#9c2632', // dark red
+  w: '#ffffff',
+  W: '#e8d8c8',
+  s: '#f3c6a5', // skin
+  S: '#d4a17a', // skin shadow
+  h: '#6b3e1f', // hair
+  H: '#8b5a2b', // hair highlight
+  b: '#2a3a78', // jeans
+  B: '#3a4d9c', // jeans highlight
+  y: '#ffd54a',
+  p: '#1a1a2e',
+  m: '#a04444',
+};
+
+const PLAYER_DOWN_A = [
+  '....KKKKKK....',
+  '...KRRRRRRK...',
+  '...KRwwwwRK...',
+  '...KRwKKwRK...',
+  '...KKKKKKKK...',
+  '...HsssssssH..',
+  '..HsssKsKsssH.',
+  '..HsssssssssH.',
+  '...sssssssss..',
+  '...sSmmmmmSs..',
+  '....sssssss...',
+  '...KRRRRRRRK..',
+  '..KRwwwwwwRK..',
+  '..KRRRRRRRRK..',
+  '..sKyyyyyKs...',
+  '..sKBBBBBKs...',
+  '...KbbbbbbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...pppppppp...',
+];
+const PLAYER_DOWN_B = [
+  ...PLAYER_DOWN_A.slice(0, 16),
+  '...Kbb..bbK...',
+  '....b....b....',
+  '....b....b....',
+  '....p....p....',
+];
+
+const PLAYER_UP_A = [
+  '....KKKKKK....',
+  '...KRRRRRRK...',
+  '...KRRRRRRK...',
+  '...KKKKKKKK...',
+  '...hhhhhhhh...',
+  '..hHhhhhhhHh..',
+  '..hhhhhhhhhh..',
+  '..hhhhhhhhhh..',
+  '...hhhhhhhh...',
+  '....hhhhhh....',
+  '....hhhhhh....',
+  '...KRRRRRRRK..',
+  '..KRRRRRRRRK..',
+  '..KRRRRRRRRK..',
+  '..sKRRRRRRKs..',
+  '..sKyyyyyKs...',
+  '...KbbbbbbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...pppppppp...',
+];
+const PLAYER_UP_B = [
+  ...PLAYER_UP_A.slice(0, 16),
+  '...Kbb..bbK...',
+  '....b....b....',
+  '....b....b....',
+  '....p....p....',
+];
+
+const PLAYER_RIGHT_A = [
+  '....KKKKK.....',
+  '...KRRRRRK....',
+  '...KRwwwRK....',
+  '...KRwKwRK....',
+  '...KKKKKKK....',
+  '....sssshh....',
+  '...Hssssshh...',
+  '...HssKssh....',
+  '...HssssshH...',
+  '....smmms.....',
+  '.....sssss....',
+  '....KRRRRR....',
+  '...KRwwRRRK...',
+  '..KRRRRRRRK...',
+  '..KRRRRRRsK...',
+  '..KyyyyyysK...',
+  '...KBBBBBK....',
+  '....KbbbbK....',
+  '....Kbb.bK....',
+  '....pppppp....',
+];
+const PLAYER_RIGHT_B = [
+  ...PLAYER_RIGHT_A.slice(0, 17),
+  '....Kbbbb.....',
+  '.....bbb......',
+  '.....ppp......',
+];
+
+function mirrorArt(rows: string[]): string[] {
+  return rows.map(r => r.split('').reverse().join(''));
+}
+
+function drawPixelArt(
+  ctx: CanvasRenderingContext2D,
+  art: string[],
+  palette: Record<string, string>,
+  px: number, py: number, scale: number,
+) {
+  for (let y = 0; y < art.length; y++) {
+    const row = art[y];
+    for (let x = 0; x < row.length; x++) {
+      const c = row[x];
+      const color = palette[c];
+      if (!color) continue;
+      ctx.fillStyle = color;
+      ctx.fillRect(px + x * scale, py + y * scale, scale, scale);
+    }
   }
 }
 
-// ─── PLAYER (bigger sprite, feet at tile center) ─────────────────────────────
 function drawPlayer(ctx: CanvasRenderingContext2D, sx: number, sy: number, facing: string, walkFrame: number) {
-  // Big shadow under feet
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath(); ctx.ellipse(sx, sy + 4, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
-  // Feet are at (sx, sy); body grows upward.
-  // Total sprite ~44 tall.
-  const cy = sy - 22; // chest center
-  // Legs (animated)
-  ctx.fillStyle = '#1a1a3e';
-  const lOff = walkFrame === 1 ? 2 : 0, rOff = walkFrame === 1 ? 0 : 2;
-  ctx.fillRect(sx - 6, sy - 8 + lOff, 5, 10);
-  ctx.fillRect(sx + 1, sy - 8 + rOff, 5, 10);
-  // Shoes
-  ctx.fillStyle = '#111';
-  ctx.fillRect(sx - 6, sy - 1, 5, 3);
-  ctx.fillRect(sx + 1, sy - 1, 5, 3);
-  // Torso (red shirt)
-  ctx.fillStyle = '#d63946';
-  ctx.beginPath(); ctx.roundRect(sx - 9, cy - 4, 18, 16, 3); ctx.fill();
-  // Belt
-  ctx.fillStyle = '#ffd54a'; ctx.fillRect(sx - 9, cy + 10, 18, 2);
-  // Arms
-  ctx.fillStyle = '#f3c6a5';
-  ctx.fillRect(sx - 12, cy + 2, 4, 8);
-  ctx.fillRect(sx + 8, cy + 2, 4, 8);
-  // Head
-  ctx.fillStyle = '#f3c6a5';
-  ctx.beginPath(); ctx.arc(sx, cy - 12, 10, 0, Math.PI * 2); ctx.fill();
-  // Pigtails (Addie)
-  ctx.fillStyle = '#a0522d';
-  ctx.beginPath(); ctx.arc(sx - 9, cy - 8, 4, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(sx + 9, cy - 8, 4, 0, Math.PI * 2); ctx.fill();
-  // Hair top
-  ctx.beginPath(); ctx.arc(sx, cy - 16, 10, Math.PI, 0); ctx.fill();
-  // Hat (red baseball cap)
-  ctx.fillStyle = '#d63946';
-  ctx.beginPath(); ctx.ellipse(sx, cy - 17, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillRect(sx - 6, cy - 21, 12, 5);
-  // Pokeball on hat
-  ctx.fillStyle = '#fff';
-  ctx.beginPath(); ctx.arc(sx, cy - 21, 2.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#1a0a0a';
-  ctx.beginPath(); ctx.arc(sx, cy - 21, 2.5, 0, Math.PI * 2); ctx.stroke();
-  // Eyes (depend on facing)
-  ctx.fillStyle = '#111';
-  if (facing === 'down') {
-    ctx.fillRect(sx - 4, cy - 13, 2, 2);
-    ctx.fillRect(sx + 2, cy - 13, 2, 2);
-    // Mouth
-    ctx.fillRect(sx - 1, cy - 8, 3, 1);
-  } else if (facing === 'up') {
-    // back of head — just hair
-  } else if (facing === 'left') {
-    ctx.fillRect(sx - 5, cy - 13, 2, 2);
-    ctx.fillRect(sx - 1, cy - 13, 2, 2);
+  // Shadow under feet
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  ctx.beginPath(); ctx.ellipse(sx, sy + 3, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+  let art: string[];
+  if (facing === 'up') art = walkFrame === 0 ? PLAYER_UP_A : PLAYER_UP_B;
+  else if (facing === 'left') art = walkFrame === 0 ? mirrorArt(PLAYER_RIGHT_A) : mirrorArt(PLAYER_RIGHT_B);
+  else if (facing === 'right') art = walkFrame === 0 ? PLAYER_RIGHT_A : PLAYER_RIGHT_B;
+  else art = walkFrame === 0 ? PLAYER_DOWN_A : PLAYER_DOWN_B;
+
+  const scale = 2;
+  const w = 14 * scale; // 28
+  const h = 20 * scale; // 40
+  drawPixelArt(ctx, art, PLAYER_PALETTE, sx - w / 2, sy - h + 2, scale);
+}
+
+// ─── PIXEL-ART NPC TRAINERS ──────────────────────────────────────────────────
+const NPC_BASE_PALETTE: Record<string, string> = {
+  K: '#1a0d00',
+  s: '#f3c6a5', S: '#d4a17a',
+  w: '#ffffff', y: '#ffd54a',
+  p: '#1a1a2e',
+};
+
+const HIKER_PALETTE = { ...NPC_BASE_PALETTE, R: '#d63946', r: '#9c2632', h: '#3a2618', H: '#5a3e1e', b: '#5a3a1e', B: '#7d5530', G: '#2d4a2a', g: '#1f3a1c' };
+const FISHER_PALETTE = { ...NPC_BASE_PALETTE, R: '#1a6b9d', r: '#0e3a5a', h: '#3a2618', H: '#5a3e1e', b: '#2a2a3e', B: '#3a3a5e' };
+const CAMPER_PALETTE = { ...NPC_BASE_PALETTE, R: '#2d6a4f', r: '#1a3f2e', h: '#5a3e1e', H: '#7a5a3e', b: '#5a3a1e', B: '#7a5a3e' };
+const LASS_PALETTE = { ...NPC_BASE_PALETTE, R: '#ff77aa', r: '#c14a7c', h: '#c19a2d', H: '#e6c860', b: '#7d2050', B: '#a04070' };
+
+const NPC_HIKER = [
+  '....hhhhhh....',
+  '...hHHHHHHh...',  // brown bandana hat
+  '...hhhhhhhh...',
+  '....ssssss....',
+  '...sssKsKss...',
+  '...ssSsSSss...',
+  '....smmmms....',
+  '....KRRRRK....',  // red plaid shirt
+  '...KRrRRrRK...',
+  '...KRRrRRrK...',
+  '...KRrRRrRK...',
+  '..bKRRRRRRKb..',  // backpack straps
+  '..bsKyyyKsb...',  // belt + pack
+  '..bbKbbbKbb...',
+  '...KBBBBBBK...',  // brown pants
+  '...KbbbbbbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...pppppppp...',
+];
+
+const NPC_FISHER = [
+  '..............',
+  '....yyyyyyy...',  // yellow rain hat
+  '..yyyyyyyyyyy.',  // wide brim
+  '....ssssss....',
+  '...sssKsKss...',
+  '...sssSSSss...',
+  '....smmmms....',
+  '....KRRRRK....',  // blue overalls
+  '...KRwwwwRK...',
+  '...KyyRRyyK...',  // suspenders
+  '..KKRRRRRRKK..',
+  '..bKRRRRRRKb..',  // arms+rod
+  '..bsKRRRRKsb..',
+  '...KRRRRRRK...',
+  '...KbbbbbbK...',  // dark pants
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...pppppppp...',
+];
+
+const NPC_CAMPER = [
+  '..............',
+  '....RRRRRR....',  // green cap
+  '...RRRRRRRR...',
+  '...KKKKKKKK...',  // brim
+  '....ssssss....',
+  '...sssKsKss...',
+  '...ssSsSSss...',
+  '....smmmms....',
+  '...KRRRRRRK...',  // green shirt
+  '..KRyyyyyyRK..',  // yellow stripe
+  '..KRRRRRRRRK..',
+  '..sKRRRRRRKs..',
+  '..sKBBBBBKs...',  // tan shorts
+  '...KbbbbbbK...',
+  '...KbbbbbbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...Kbb..bbK...',
+  '...pppppppp...',
+];
+
+const NPC_LASS = [
+  '....HHHHHH....',  // blonde hair top
+  '...HhhhhhhH...',
+  '..Hhhhhhhhhh..',  // long sides
+  '..HhssssshhH..',
+  '..hsssKsKssh..',
+  '..hsSssssSsh..',
+  '..hhsmmmmsh...',
+  '...KRRRRRRK...',  // pink dress top
+  '..KRwwRRwwRK..',  // collar
+  '..KRRRRRRRRK..',
+  '..KRRRRRRRRK..',
+  '..sKRRRRRRKs..',
+  '..sKyyyyyKs...',  // yellow belt
+  '..KRRRRRRRRK..',  // pink skirt
+  '.KRRRRRRRRRRK.',
+  '.KRRRRRRRRRRK.',
+  '..ssssssss....',  // bare legs
+  '..ssss..ss....',
+  '..ssss..ss....',
+  '...pp....pp...',
+];
+
+const NPC_PALETTES: Record<string, Record<string, string>> = {
+  hiker: HIKER_PALETTE,
+  fisher: FISHER_PALETTE,
+  camper: CAMPER_PALETTE,
+  lass: LASS_PALETTE,
+  bug: CAMPER_PALETTE,
+};
+const NPC_ART: Record<string, string[]> = {
+  hiker: NPC_HIKER,
+  fisher: NPC_FISHER,
+  camper: NPC_CAMPER,
+  lass: NPC_LASS,
+  bug: NPC_CAMPER,
+};
+
+function drawTrainerNPC(ctx: CanvasRenderingContext2D, t: TrainerNPC, sx: number, sy: number, defeated: boolean) {
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.32)';
+  ctx.beginPath(); ctx.ellipse(sx, sy + 16, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+  const art = NPC_ART[t.kind] || NPC_CAMPER;
+  const palette = NPC_PALETTES[t.kind] || CAMPER_PALETTE;
+  const scale = 2;
+  const w = 14 * scale, h = 20 * scale;
+  drawPixelArt(ctx, art, palette, sx - w / 2, sy - h / 2 - 4, scale);
+
+  // Fisher's rod
+  if (t.kind === 'fisher') {
+    ctx.strokeStyle = '#5a3e1e'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(sx + 8, sy + 2); ctx.lineTo(sx + 22, sy - 18); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(sx + 22, sy - 18); ctx.lineTo(sx + 24, sy - 4); ctx.stroke();
+    ctx.fillStyle = '#d63946'; ctx.beginPath(); ctx.arc(sx + 24, sy - 3, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Hiker's backpack hump
+  if (t.kind === 'hiker') {
+    ctx.fillStyle = '#5a3a1e';
+    ctx.beginPath(); ctx.roundRect(sx - 14, sy - 8, 6, 14, 2); ctx.fill();
+    ctx.strokeStyle = '#1a0d00'; ctx.lineWidth = 1; ctx.stroke();
+  }
+
+  if (defeated) {
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.beginPath(); ctx.arc(sx, sy - 4, 18, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4ade80'; ctx.font = 'bold 18px "Segoe UI"';
+    ctx.textAlign = 'center'; ctx.fillText('✓', sx, sy + 1);
   } else {
-    ctx.fillRect(sx + 1, cy - 13, 2, 2);
-    ctx.fillRect(sx + 5, cy - 13, 2, 2);
+    const bob = Math.sin(t.bobTimer * 2) * 2;
+    ctx.fillStyle = '#ffd54a';
+    ctx.beginPath(); ctx.arc(sx + 14, sy - 22 + bob, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#1a0d00'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#d63946'; ctx.font = 'bold 10px "Segoe UI"';
+    ctx.textAlign = 'center'; ctx.fillText('!', sx + 14, sy - 19 + bob);
   }
 }
 

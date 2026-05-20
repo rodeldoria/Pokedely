@@ -1,0 +1,71 @@
+Starting June 18th a new GraphQL specification is rolling out, v1beta2. Read more at GraphQL v1beta2. The former v1beta version is sun-setting and scheduled to be removed.
+
+
+PokéAPI
+The RESTful Pokémon API
+Serving over 50 billion API calls each month!
+
+All the Pokémon data you'll ever need in one place,
+easily accessible through a modern free open-source RESTful API.
+
+Check out the docs!
+
+Try it now!
+https://pokeapi.co/api/v2/
+pokemon/ditto
+
+Submit
+Need a hint? Try pokemon/ditto, pokemon-species/aegislash, type/3, ability/battle-armor, or pokemon?limit=100000&offset=0.
+
+Direct link to results: https://pokeapi.co/api/v2/pokemon/ditto
+
+Resource for ditto
+name:"limber"
+url:"https://pokeapi.co/api/v2/ability/7/"
+is_hidden:false
+slot:1
+name:"imposter"
+url:"https://pokeapi.co/api/v2/ability/150/"
+is_hidden:true
+slot:3
+base_experience:101
+latest:"https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/132.ogg"
+legacy:"https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/132.ogg"
+name:"ditto"
+url:"https://pokeapi.co/api/v2/pokemon-form/132/"
+height:3
+name:"metal-powder"
+url:"https://pokeapi.co/api/v2/item/234/"
+name:"quick-powder"
+url:"https://pokeapi.co/api/v2/item/251/"
+id:132
+is_default:true
+location_area_encounters:"https://pokeapi.co/api/v2/pokemon/132/encounters"
+name:"transform"
+url:"https://pokeapi.co/api/v2/move/144/"
+name:"ditto"
+order:214
+name:"generation-iv"
+url:"https://pokeapi.co/api/v2/generation/4/"
+name:"generation-i"
+url:"https://pokeapi.co/api/v2/generation/1/"
+past_types:
+name:"ditto"
+url:"https://pokeapi.co/api/v2/pokemon-species/132/"
+slot:1
+name:"normal"
+url:"https://pokeapi.co/api/v2/type/1/"
+weight:40
+ View raw JSON (36.423 kB, 1062 lines)
+What is this?
+This is a full RESTful API linked to an extensive database detailing everything about the Pokémon main game series.
+
+We've covered everything from Pokémon to Berry Flavors.
+
+Where do I start?
+We have awesome documentation on how to use this API. It takes minutes to get started.
+
+This API will always be publicly available and will never require any extensive setup process to consume.
+
+Created by Paul Hallett and other PokéAPI contributors around the world. Pokémon and Pokémon character names are trademarks of Nintendo.
+Status
