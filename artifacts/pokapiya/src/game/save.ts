@@ -7,6 +7,9 @@ export interface PartyMember {
   caughtAt: number;
   hp?: number;
   maxHp?: number;
+  // Trainer's stats.correct at the time this Pokémon was caught. Used to
+  // measure XP progress toward evolution (see game/evolution.ts).
+  correctAtCatch?: number;
 }
 
 export function memberMaxHp(_m: PartyMember, trainerLevel: number): number {
@@ -122,7 +125,13 @@ export function recordCatch(state: TrainerState, pokemon: Pokemon) {
   entry.caught = true;
   entry.count = (entry.count || 0) + 1;
   state.pokedex[pokemon.id] = entry;
-  const member: PartyMember = { id: pokemon.id, name: pokemon.name, types: pokemon.types, caughtAt: Date.now() };
+  const member: PartyMember = {
+    id: pokemon.id,
+    name: pokemon.name,
+    types: pokemon.types,
+    caughtAt: Date.now(),
+    correctAtCatch: state.stats.correct
+  };
   if (state.team.length < 6) state.team.push(member);
   else state.box.push(member);
   save(state);
@@ -132,6 +141,10 @@ export function recordAnswer(state: TrainerState, correct: boolean) {
   if (correct) state.stats.correct += 1; else state.stats.wrong += 1;
   save(state);
 }
+
+// Re-imported here to avoid a circular import via evolution.ts → save.ts.
+// Callers should invoke `checkEvolutions` from game/evolution.ts after a
+// batch of correct answers or after a catch.
 
 export function takeItem(state: TrainerState, x: number, y: number, type: string): boolean {
   const key = `${x},${y}`;
