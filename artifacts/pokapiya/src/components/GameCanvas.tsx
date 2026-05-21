@@ -1076,11 +1076,16 @@ function drawPlacedStructure(ctx: CanvasRenderingContext2D, kind: StructureKind,
 
 // ─── TILE DRAWING ─────────────────────────────────────────────────────────────
 function drawTile(ctx: CanvasRenderingContext2D, code: TileCode, sx: number, sy: number, tx: number, ty: number) {
-  const grassVar = (tx * 7 + ty * 13) % 4;
-  ctx.fillStyle = grassVar === 0 ? '#6bbd4c' : grassVar === 1 ? '#70c252' : grassVar === 2 ? '#67b647' : '#6bbd4c';
+  // Calmer grass: a single base colour with one subtle blade per tile.
+  // The old 4-tone checkerboard + 3 dark dots per tile read as visual
+  // noise/"grain" at the new 1.5× zoom — too busy for a kid's game.
+  ctx.fillStyle = '#7ac958';
   ctx.fillRect(sx, sy, TS, TS);
-  ctx.fillStyle = '#57a83c';
-  for (let i = 0; i < 3; i++) ctx.fillRect(sx + (i * 7 + tx * 3) % (TS - 2), sy + (i * 11 + ty * 5) % (TS - 2), 2, 2);
+  // One soft blade per tile, deterministic by coords.
+  if (((tx * 7 + ty * 13) & 3) === 0) {
+    ctx.fillStyle = '#6abf4a';
+    ctx.fillRect(sx + ((tx * 5 + ty * 3) % (TS - 4)) + 2, sy + ((tx * 11 + ty * 7) % (TS - 4)) + 2, 2, 2);
+  }
   if (code === TILE.GRASS) return;
   switch (code) {
     case TILE.TALLGRASS: drawTallGrass(ctx, sx, sy); break;
@@ -1145,13 +1150,13 @@ function drawWater(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
 }
 function drawPath(ctx: CanvasRenderingContext2D, sx: number, sy: number, tx: number, ty: number) {
   ctx.fillStyle = '#d9b074'; ctx.fillRect(sx, sy, TS, TS);
-  ctx.fillStyle = '#c69a5c';
-  for (let i = 0; i < 5; i++) ctx.fillRect(sx + (i * 7 + tx * 3) % (TS - 3), sy + (i * 11 + ty * 4) % (TS - 3), 3, 2);
+  if (((tx * 5 + ty * 7) & 3) === 0) {
+    ctx.fillStyle = '#c69a5c';
+    ctx.fillRect(sx + ((tx * 11 + ty * 5) % (TS - 4)) + 2, sy + ((tx * 7 + ty * 13) % (TS - 4)) + 2, 2, 2);
+  }
 }
 function drawSand(ctx: CanvasRenderingContext2D, sx: number, sy: number) {
   ctx.fillStyle = '#eed8a1'; ctx.fillRect(sx, sy, TS, TS);
-  ctx.fillStyle = '#d6c08a';
-  for (let i = 0; i < 4; i++) ctx.fillRect(sx + (i * 9) % (TS - 2), sy + (i * 7) % (TS - 2), 2, 2);
 }
 function drawFlower(ctx: CanvasRenderingContext2D, sx: number, sy: number, tx: number, ty: number) {
   const v = (tx + ty * 3) % 3;

@@ -109,9 +109,13 @@ const empty = (): TrainerState => ({
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
   inventory: {
     pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0,
-    lumber: 0, stone: 0, seed: 0, water: 0, metal: 0,
-    fence: 0, berry_tree: 0, path_tile: 0, house: 0,
-    sapling: 0, statue: 0, lantern: 0, sign: 0, bridge: 0, flower_pot: 0,
+    // Starter materials so the workshop is immediately useful — Addie
+    // can craft a small fence/path/flower without grinding wood first.
+    lumber: 6, stone: 6, seed: 3, water: 0, metal: 1,
+    // Starter pack of pre-crafted placeables so build mode (B) is
+    // immediately playable on a fresh save.
+    fence: 4, berry_tree: 0, path_tile: 4, house: 1,
+    sapling: 2, statue: 0, lantern: 1, sign: 1, bridge: 0, flower_pot: 2,
   },
   placedStructures: {},
   houseResidents: {},
@@ -170,6 +174,25 @@ export function isRockIntact(state: TrainerState, key: string, now: number = Dat
 // EvolutionModal will prompt her again at the right time.
 const EEVEELUTION_IDS = new Set([134, 135, 136, 196, 197, 470, 471, 700]);
 const EEVEE_REVERT_FLAG = 'pokapiya:eeveeReverted';
+const STARTER_PACK_FLAG = 'pokapiya:starterPackGranted';
+
+// One-time grant for existing saves so they get the same "ready to build"
+// experience as a fresh save. Only fires once per device thanks to the flag.
+function grantStarterPack(state: TrainerState): boolean {
+  const inv = state.inventory;
+  inv.lumber = Math.max(inv.lumber, 6);
+  inv.stone = Math.max(inv.stone, 6);
+  inv.seed = Math.max(inv.seed, 3);
+  inv.metal = Math.max(inv.metal, 1);
+  inv.fence = Math.max(inv.fence, 4);
+  inv.path_tile = Math.max(inv.path_tile, 4);
+  inv.house = Math.max(inv.house, 1);
+  inv.sapling = Math.max(inv.sapling, 2);
+  inv.lantern = Math.max(inv.lantern, 1);
+  inv.sign = Math.max(inv.sign, 1);
+  inv.flower_pot = Math.max(inv.flower_pot, 2);
+  return true;
+}
 
 function revertEeveelutions(state: TrainerState): boolean {
   let changed = false;
@@ -214,6 +237,10 @@ export function load(): TrainerState {
     if (!localStorage.getItem(EEVEE_REVERT_FLAG)) {
       if (revertEeveelutions(merged)) needsResave = true;
       try { localStorage.setItem(EEVEE_REVERT_FLAG, '1'); } catch {}
+    }
+    if (!localStorage.getItem(STARTER_PACK_FLAG)) {
+      if (grantStarterPack(merged)) needsResave = true;
+      try { localStorage.setItem(STARTER_PACK_FLAG, '1'); } catch {}
     }
 
     if (needsResave) {
