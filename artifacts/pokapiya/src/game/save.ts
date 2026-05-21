@@ -45,10 +45,16 @@ export interface TrainerState {
     // placed. When she enters build mode (B in the overworld) she spends
     // one of these to drop the structure on a free grass tile.
     fence: number; berry_tree: number; path_tile: number; house: number;
+    sapling: number; statue: number; lantern: number; sign: number;
+    bridge: number; flower_pot: number;
   };
   // Tile-scoped map of structures Addie has placed in the world.
   // Key format: `${zoneId}:${x},${y}`. Value is the structure kind.
   placedStructures: Record<string, StructureKind>;
+  // For placed houses only: the dex id of the Pokémon "living" there.
+  // Lets Addie assign a roommate after stepping inside (HouseInteriorModal).
+  // Key format matches placedStructures (e.g. "town:8,12").
+  houseResidents: Record<string, number>;
   // Tile-scoped maps. Keys are namespaced as `${zoneId}:${x},${y}` so the
   // same coordinates in different zones don't collide.
   worldItems: Record<string, boolean>;
@@ -72,9 +78,28 @@ const LEGACY_KEY_V3 = 'pokapiya.save.v3';
 export const RESOURCE_RESPAWN_MS = 3 * 60 * 1000;
 
 // Kinds of structures Addie can craft at the workshop and place in the world.
-// Order matches the build-mode picker (1/2/3/4) in GameCanvas.
-export type StructureKind = 'fence' | 'berry_tree' | 'path_tile' | 'house';
-export const STRUCTURE_KINDS: StructureKind[] = ['fence', 'berry_tree', 'path_tile', 'house'];
+// Order is the order they appear in build mode when cycling with [ / ].
+export type StructureKind =
+  | 'fence' | 'path_tile' | 'sign' | 'flower_pot' | 'lantern'
+  | 'sapling' | 'berry_tree' | 'statue' | 'bridge' | 'house';
+export const STRUCTURE_KINDS: StructureKind[] = [
+  'fence', 'path_tile', 'sign', 'flower_pot', 'lantern',
+  'sapling', 'berry_tree', 'statue', 'bridge', 'house',
+];
+
+// Human-readable labels + emoji for the build-mode HUD and toasts.
+export const STRUCTURE_LABEL: Record<StructureKind, { name: string; emoji: string }> = {
+  fence: { name: 'Wooden Fence', emoji: '🪵' },
+  path_tile: { name: 'Stone Path', emoji: '🪨' },
+  sign: { name: 'Sign Post', emoji: '🪧' },
+  flower_pot: { name: 'Flower Pot', emoji: '🌷' },
+  lantern: { name: 'Lantern', emoji: '🏮' },
+  sapling: { name: 'Sapling', emoji: '🌱' },
+  berry_tree: { name: 'Berry Tree', emoji: '🍓' },
+  statue: { name: 'Statue', emoji: '🗿' },
+  bridge: { name: 'Wooden Bridge', emoji: '🌉' },
+  house: { name: 'Cozy House', emoji: '🏠' },
+};
 
 const empty = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
@@ -86,8 +111,10 @@ const empty = (): TrainerState => ({
     pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0,
     lumber: 0, stone: 0, seed: 0, water: 0, metal: 0,
     fence: 0, berry_tree: 0, path_tile: 0, house: 0,
+    sapling: 0, statue: 0, lantern: 0, sign: 0, bridge: 0, flower_pot: 0,
   },
   placedStructures: {},
+  houseResidents: {},
   worldItems: {},
   cutTrees: {},
   minedRocks: {},
@@ -179,6 +206,7 @@ export function load(): TrainerState {
       minedRocks: migrateTimestampKeys(parsed.minedRocks),
       defeatedTrainers: parsed.defeatedTrainers || {},
       placedStructures: parsed.placedStructures || {},
+      houseResidents: parsed.houseResidents || {},
       currentZone: ZONE_IDS.includes(parsed.currentZone) ? (parsed.currentZone as ZoneId) : 'town',
     };
 
@@ -356,7 +384,7 @@ export function structureCountFor(state: TrainerState, kind: StructureKind): num
 
 export function totalPlaceables(state: TrainerState): number {
   const inv = state.inventory;
-  return inv.fence + inv.berry_tree + inv.path_tile + inv.house;
+  return STRUCTURE_KINDS.reduce((sum, k) => sum + (inv[k] || 0), 0);
 }
 
 export function getStructureAt(state: TrainerState, zoneId: string, x: number, y: number): StructureKind | null {
@@ -392,10 +420,11 @@ export function removeStructure(state: TrainerState, zoneId: string, x: number, 
   return true;
 }
 
-// A placed berry_tree is "solid" for collision; path_tile is walkable;
-// fence and house are solid.
+// Walkable placements (Addie can step onto them): path tiles, bridges, and
+// saplings (so she doesn't get stuck on one she just planted). Everything
+// else blocks movement so it reads as a real obstacle in the world.
 export function isPlacedSolid(kind: StructureKind): boolean {
-  return kind !== 'path_tile';
+  return kind !== 'path_tile' && kind !== 'bridge' && kind !== 'sapling';
 }
 
 export function craft(state: TrainerState, recipeId: string): boolean {
@@ -403,31 +432,40 @@ export function craft(state: TrainerState, recipeId: string): boolean {
   switch (recipeId) {
     case 'fence':
       if (inv.lumber < 2) return false;
-      inv.lumber -= 2;
-      inv.fence += 1;
-      save(state);
-      return true;
+      inv.lumber -= 2; inv.fence += 1; save(state); return true;
     case 'path':
       if (inv.stone < 2) return false;
-      inv.stone -= 2;
-      inv.path_tile += 1;
-      save(state);
-      return true;
+      inv.stone -= 2; inv.path_tile += 1; save(state); return true;
+    case 'sign':
+      if (inv.lumber < 1) return false;
+      inv.lumber -= 1; inv.sign += 1; save(state); return true;
+    case 'flower-pot':
+      if (inv.seed < 1 || inv.stone < 1) return false;
+      inv.seed -= 1; inv.stone -= 1; inv.flower_pot += 1; save(state); return true;
+    case 'lantern':
+      if (inv.metal < 1 || inv.stone < 1) return false;
+      inv.metal -= 1; inv.stone -= 1; inv.lantern += 1; save(state); return true;
+    case 'sapling': {
+      // Plant move: free for grass-type teachers, otherwise costs 1 Seed.
+      const hasGrass = state.team.some(m => m.types.includes('grass'));
+      if (!hasGrass) {
+        if (inv.seed < 1) return false;
+        inv.seed -= 1;
+      }
+      inv.sapling += 1; save(state); return true;
+    }
     case 'berry-tree':
       if (inv.seed < 1 || inv.lumber < 1) return false;
-      inv.seed -= 1;
-      inv.lumber -= 1;
-      inv.berry_tree += 1;
-      save(state);
-      return true;
+      inv.seed -= 1; inv.lumber -= 1; inv.berry_tree += 1; save(state); return true;
+    case 'statue':
+      if (inv.stone < 6) return false;
+      inv.stone -= 6; inv.statue += 1; save(state); return true;
+    case 'bridge':
+      if (inv.lumber < 4) return false;
+      inv.lumber -= 4; inv.bridge += 1; save(state); return true;
     case 'house':
       if (inv.lumber < 8 || inv.stone < 4 || inv.metal < 1) return false;
-      inv.lumber -= 8;
-      inv.stone -= 4;
-      inv.metal -= 1;
-      inv.house += 1;
-      save(state);
-      return true;
+      inv.lumber -= 8; inv.stone -= 4; inv.metal -= 1; inv.house += 1; save(state); return true;
     case 'sell-berry':
       if (inv.berry < 1) return false;
       inv.berry -= 1;

@@ -14,12 +14,13 @@ import { preloadSprites } from './data/pokedex';
 import QuestModal from './components/QuestModal';
 import MovesModal from './components/MovesModal';
 import CraftModal from './components/CraftModal';
+import HouseInteriorModal from './components/HouseInteriorModal';
 import EvolutionModal from './components/EvolutionModal';
 import { pendingEvolutions, evolveMember, declineEvolution, type PendingEvolution } from './game/evolution';
 import type { Pokemon } from './data/pokedex';
 import type { NPCTrainer } from './game/world';
 
-type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak' | 'quests' | 'moves' | 'craft';
+type Screen = 'world' | 'battle' | 'team' | 'pokecenter' | 'pokedex' | 'pc' | 'starter' | 'oak' | 'quests' | 'moves' | 'craft' | 'house';
 
 const TRAINER_COIN_REWARD = 12;
 
@@ -63,6 +64,12 @@ export default function App() {
   const handlePokecenter = useCallback(() => {
     if (screen === 'world') setScreen('pokecenter');
   }, [screen]);
+
+  const [activeHouseKey, setActiveHouseKey] = useState<string | null>(null);
+  const handleEnterHouse = useCallback((houseKey: string) => {
+    setActiveHouseKey(houseKey);
+    setScreen('house');
+  }, []);
 
   const handleBattleExit = useCallback((caught: boolean, defeatedTrainer: boolean) => {
     if (defeatedTrainer && currentTrainer) {
@@ -195,6 +202,7 @@ export default function App() {
         onEncounter={handleEncounter}
         onTrainerEncounter={handleTrainerEncounter}
         onPokecenter={handlePokecenter}
+        onEnterHouse={handleEnterHouse}
         onToast={showToast}
         stateRef={stateRef}
         controllerRef={gameRef}
@@ -265,6 +273,15 @@ export default function App() {
 
       {screen === 'craft' && (
         <CraftModal state={trainerState} onChange={handleStateChange} onClose={() => setScreen('world')} />
+      )}
+
+      {screen === 'house' && activeHouseKey && (
+        <HouseInteriorModal
+          state={trainerState}
+          houseKey={activeHouseKey}
+          onChange={handleStateChange}
+          onClose={() => { setActiveHouseKey(null); setScreen('world'); }}
+        />
       )}
 
       {screen === 'pc' && (

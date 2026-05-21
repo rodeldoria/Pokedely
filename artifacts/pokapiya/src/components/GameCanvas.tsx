@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, adjacentToRock, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
 import { spriteUrl, pickRandom, byId, pickByType, pickForZone, maxDexForLevel, displayName, type Pokemon } from '../data/pokedex';
-import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeStanding, isRockIntact, setZone, getLevel, type TrainerState } from '../game/save';
+import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeStanding, isRockIntact, setZone, getLevel, placeStructure, isPlacedSolid, STRUCTURE_KINDS, STRUCTURE_LABEL, structureCountFor, type StructureKind, type TrainerState } from '../game/save';
 import { getTrainerPortrait, preloadAllTrainerPortraits } from './TrainerSprite';
 
 const TS = 32;
@@ -81,6 +81,14 @@ interface GameState {
   keys: Set<string>;
   fJustPressed: boolean;
   spaceJustPressed: boolean;
+  bJustPressed: boolean;
+  bracketLeftJust: boolean;
+  bracketRightJust: boolean;
+  // Build mode lets Addie place crafted structures from her inventory onto
+  // the tile she's facing. Toggled with B. While buildMode is true, F
+  // places the selected structure instead of chopping/mining.
+  buildMode: boolean;
+  buildIdx: number;
   encounterCooldown: number;
   lastTileKey: string;
   ambientMons: AmbientMon[];
@@ -119,19 +127,23 @@ interface Props {
   onEncounter: (wild: Pokemon, biasId: number | null) => void;
   onTrainerEncounter: (wild: Pokemon, trainer: NPCTrainer) => void;
   onPokecenter: () => void;
+  // Fires when Addie presses F next to a placed house. Carries the
+  // namespaced key (e.g. "town:8,12") so the modal can look up the
+  // resident in state.houseResidents.
+  onEnterHouse: (houseKey: string) => void;
   onToast: (msg: string) => void;
   stateRef: React.MutableRefObject<TrainerState>;
   controllerRef?: React.MutableRefObject<GameCanvasController | null>;
 }
 
-export default function GameCanvas({ active, onEncounter, onTrainerEncounter, onPokecenter, onToast, stateRef, controllerRef }: Props) {
+export default function GameCanvas({ active, onEncounter, onTrainerEncounter, onPokecenter, onEnterHouse, onToast, stateRef, controllerRef }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gsRef = useRef<GameState | null>(null);
   const rafRef = useRef<number>(0);
   const activeRef = useRef(active);
-  const callbacksRef = useRef({ onEncounter, onTrainerEncounter, onPokecenter, onToast });
+  const callbacksRef = useRef({ onEncounter, onTrainerEncounter, onPokecenter, onEnterHouse, onToast });
   useEffect(() => { activeRef.current = active; }, [active]);
-  useEffect(() => { callbacksRef.current = { onEncounter, onTrainerEncounter, onPokecenter, onToast }; });
+  useEffect(() => { callbacksRef.current = { onEncounter, onTrainerEncounter, onPokecenter, onEnterHouse, onToast }; });
 
   const loadImg = useCallback((url: string, gs: GameState, cb?: (img: HTMLImageElement) => void) => {
     if (gs.images.has(url)) { cb?.(gs.images.get(url)!); return; }
@@ -164,6 +176,8 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       camX: 0, camY: 0,
       keys: new Set(),
       fJustPressed: false, spaceJustPressed: false,
+      bJustPressed: false, bracketLeftJust: false, bracketRightJust: false,
+      buildMode: false, buildIdx: 0,
       encounterCooldown: 0,
       lastTileKey: '',
       ambientMons: makeAmbientMons(initialZone, worldMap),
@@ -221,6 +235,10 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       if (!gs.keys.has(k)) {
         if (k === 'f') gs.fJustPressed = true;
         if (k === ' ' || k === 'enter') gs.spaceJustPressed = true;
+        if (k === 'b') gs.bJustPressed = true;
+        if (k === '[') gs.bracketLeftJust = true;
+        if (k === ']') gs.bracketRightJust = true;
+        if (k === 'escape' && gs.buildMode) gs.buildMode = false;
       }
       gs.keys.add(k);
     };
@@ -249,7 +267,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       gs.lastTime = time;
       if (dt > 0) {
         const cb = callbacksRef.current;
-        update(gs, dt, cb.onEncounter, cb.onTrainerEncounter, cb.onPokecenter, cb.onToast, stateRef);
+        update(gs, dt, cb.onEncounter, cb.onTrainerEncounter, cb.onPokecenter, cb.onEnterHouse, cb.onToast, stateRef);
         draw(canvas, gs);
       }
       rafRef.current = requestAnimationFrame(loop);
@@ -317,11 +335,36 @@ function update(
   onEncounter: Props['onEncounter'],
   onTrainerEncounter: Props['onTrainerEncounter'],
   onPokecenter: Props['onPokecenter'],
+  onEnterHouse: Props['onEnterHouse'],
   onToast: Props['onToast'],
   stateRef: React.MutableRefObject<TrainerState>,
 ) {
   const { worldMap: { map, width, height, features } } = gs;
   const keys = gs.keys;
+
+  // ── Build mode toggle + cycle ────────────────────────────────────────
+  // B opens/closes build mode; [ and ] cycle through STRUCTURE_KINDS so
+  // Addie can pick what to place without leaving the world. Cycling is
+  // unrestricted (you can hover an empty slot) so she sees the full menu.
+  if (gs.bJustPressed) {
+    gs.bJustPressed = false;
+    gs.buildMode = !gs.buildMode;
+    if (gs.buildMode) {
+      onToast(`🔨 Build mode ON — [/] to pick, F to place, B to exit`);
+    }
+  }
+  if (gs.bracketLeftJust) {
+    gs.bracketLeftJust = false;
+    if (gs.buildMode) {
+      gs.buildIdx = (gs.buildIdx - 1 + STRUCTURE_KINDS.length) % STRUCTURE_KINDS.length;
+    }
+  }
+  if (gs.bracketRightJust) {
+    gs.bracketRightJust = false;
+    if (gs.buildMode) {
+      gs.buildIdx = (gs.buildIdx + 1) % STRUCTURE_KINDS.length;
+    }
+  }
 
   // If fishing, freeze movement & wait for nibble
   if (gs.fishing?.active) {
@@ -383,7 +426,16 @@ function update(
       // her feet) — let her walk off.
       if (Math.floor(gs.px) === tx && Math.floor(gs.py) === ty) return false;
     }
-    return isSolid(t);
+    if (isSolid(t)) return true;
+    // Placed structures also act as collision when their kind is solid
+    // (fences, houses, statues, etc.). Walkable kinds (paths, bridges,
+    // saplings) pass through.
+    const placed = gs.state.placedStructures[`${gs.zoneId}:${tx},${ty}`];
+    if (placed && isPlacedSolid(placed)) {
+      if (Math.floor(gs.px) === tx && Math.floor(gs.py) === ty) return false;
+      return true;
+    }
+    return false;
   };
   if (collTile(npx, gs.py)) npx = gs.px;
   if (collTile(npx, npy)) npy = gs.py;
@@ -491,9 +543,52 @@ function update(
 
   gs.encounterCooldown = Math.max(0, gs.encounterCooldown - dt);
 
-  // ── F-key actions: fish / cut / mine / scoop ──────────────────────────
+  // ── F-key actions: build-mode place / enter house / fish / cut / mine / scoop ──
   if (gs.fJustPressed) {
     gs.fJustPressed = false;
+    // Tile directly in front of Addie based on facing.
+    const dx = gs.facing === 'left' ? -1 : gs.facing === 'right' ? 1 : 0;
+    const dy = gs.facing === 'up' ? -1 : gs.facing === 'down' ? 1 : 0;
+    const ftx = Math.floor(gs.px) + dx;
+    const fty = Math.floor(gs.py) + dy;
+    const frontKey = `${gs.zoneId}:${ftx},${fty}`;
+
+    // Build mode: F places the selected structure onto the front tile.
+    if (gs.buildMode) {
+      const kind = STRUCTURE_KINDS[gs.buildIdx];
+      const count = structureCountFor(gs.state, kind);
+      if (count <= 0) {
+        const lbl = STRUCTURE_LABEL[kind];
+        gs.toast = { text: `You have no ${lbl.emoji} ${lbl.name} — craft one first!`, timer: 2 };
+      } else {
+        const tCode = map[fty]?.[ftx] as TileCode | undefined;
+        const tileOk = tCode !== undefined && !isSolid(tCode)
+          && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS;
+        const alreadyPlaced = !!gs.state.placedStructures[frontKey];
+        const onItem = gs.items.some(it => it.tx === ftx && it.ty === fty
+          && !gs.state.worldItems[`${gs.zoneId}:${it.tx},${it.ty}`]);
+        const onPlayer = Math.floor(gs.px) === ftx && Math.floor(gs.py) === fty;
+        if (!tileOk || alreadyPlaced || onItem || onPlayer) {
+          gs.toast = { text: `Can't build there — pick an empty grass/path tile!`, timer: 2 };
+        } else {
+          placeStructure(gs.state, gs.zoneId, ftx, fty, kind);
+          stateRef.current = gs.state;
+          const lbl = STRUCTURE_LABEL[kind];
+          gs.toast = { text: `🔨 Placed ${lbl.emoji} ${lbl.name}!`, timer: 1.6 };
+        }
+      }
+      return;
+    }
+
+    // Enter house: if the tile in front holds a placed house, open its interior.
+    const frontPlaced = gs.state.placedStructures[frontKey];
+    if (frontPlaced === 'house') {
+      save(gs.state);
+      stateRef.current = gs.state;
+      onEnterHouse(frontKey);
+      return;
+    }
+
     const treeIsStanding = (key: string) => isTreeStanding(gs.state, key);
     const rockIsIntact = (key: string) => isRockIntact(gs.state, key);
     const tree = adjacentToTree(map, gs.px, gs.py, treeIsStanding, gs.zoneId);
@@ -700,6 +795,28 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     drawPokecenter(ctx, features.pokeCenter.x * TS - camX, features.pokeCenter.y * TS - camY);
   }
 
+  // Placed structures (Addie's crafted/built items). Flat ground kinds
+  // (paths, bridges) are drawn now so sprites walk on top of them. Tall
+  // kinds (houses, statues, signs, lanterns, trees, flower pots) are
+  // pushed into the sprite-sort list so Addie can walk *behind* them when
+  // she's at a smaller y-coordinate. Without this a placed house always
+  // sat in front of the player which looked wrong from the north side.
+  const tallPlaced = new Set<StructureKind>(['house', 'statue', 'sign', 'lantern', 'berry_tree', 'flower_pot']);
+  const tallStructures: Array<{ kind: StructureKind; pxs: number; pys: number }> = [];
+  for (const [key, kind] of Object.entries(gs.state.placedStructures)) {
+    const [zone, coords] = key.split(':');
+    if (zone !== gs.zoneId) continue;
+    const [pxs, pys] = coords.split(',').map(n => parseInt(n, 10));
+    if (Number.isNaN(pxs) || Number.isNaN(pys)) continue;
+    if (pxs < startTX - 1 || pxs > endTX + 1 || pys < startTY - 1 || pys > endTY + 1) continue;
+    const k = kind as StructureKind;
+    if (tallPlaced.has(k)) {
+      tallStructures.push({ kind: k, pxs, pys });
+    } else {
+      drawPlacedStructure(ctx, k, pxs * TS - camX, pys * TS - camY);
+    }
+  }
+
   for (const sgn of features.signs) drawSign(ctx, sgn.x * TS - camX, sgn.y * TS - camY, sgn.text);
 
   for (const it of gs.items) {
@@ -710,6 +827,14 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   }
 
   const sprites: Array<{ y: number; draw: () => void }> = [];
+
+  // Tall placed structures join the sprite-sort list anchored at their
+  // bottom edge (y+0.9) so Addie passes in front when she's south of them
+  // and behind when she's to the north.
+  for (const t of tallStructures) {
+    const sx = t.pxs * TS - camX, sy = t.pys * TS - camY;
+    sprites.push({ y: t.pys + 0.9, draw: () => drawPlacedStructure(ctx, t.kind, sx, sy) });
+  }
 
   for (const a of gs.ambientMons) {
     const sx = a.x * TS - camX;
@@ -771,14 +896,69 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     ctx.fillText('ENTER', dsx + TS / 2, dsy - 2);
   }
 
-  // F-prompt: tree / rock / water indicator. Trees take priority (matches
-  // the F-press handler order above), then rocks, then water.
+  // Build-mode overlay: highlight the tile in front of Addie, draw a ghost
+  // of the selected structure there, and overlay an HUD strip with the
+  // current pick + remaining count.
+  if (gs.buildMode) {
+    const dx = gs.facing === 'left' ? -1 : gs.facing === 'right' ? 1 : 0;
+    const dy = gs.facing === 'up' ? -1 : gs.facing === 'down' ? 1 : 0;
+    const ftx = Math.floor(gs.px) + dx;
+    const fty = Math.floor(gs.py) + dy;
+    const cx = ftx * TS - camX, cy = fty * TS - camY;
+    const tCode = map[fty]?.[ftx] as TileCode | undefined;
+    const tileOk = tCode !== undefined && !isSolid(tCode)
+      && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS
+      && !gs.state.placedStructures[`${gs.zoneId}:${ftx},${fty}`];
+    const pulse = 0.4 + Math.sin(Date.now() / 220) * 0.2;
+    ctx.fillStyle = tileOk ? `rgba(124,252,124,${pulse})` : `rgba(255,90,90,${pulse})`;
+    ctx.fillRect(cx, cy, TS, TS);
+    ctx.strokeStyle = tileOk ? '#7cfc7c' : '#ff5a5a';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cx + 1, cy + 1, TS - 2, TS - 2);
+
+    const kind = STRUCTURE_KINDS[gs.buildIdx];
+    const count = structureCountFor(gs.state, kind);
+    if (count > 0 && tileOk) {
+      ctx.globalAlpha = 0.55;
+      drawPlacedStructure(ctx, kind, cx, cy);
+      ctx.globalAlpha = 1;
+    }
+
+    // HUD strip across the bottom.
+    const hudH = 38;
+    ctx.fillStyle = 'rgba(10,6,2,0.92)';
+    ctx.fillRect(0, CANVAS_H - hudH, CANVAS_W, hudH);
+    ctx.strokeStyle = '#7c5a2a'; ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, CANVAS_H - hudH + 0.5, CANVAS_W - 1, hudH - 1);
+    const lbl = STRUCTURE_LABEL[kind];
+    ctx.fillStyle = count > 0 ? '#ffd54a' : '#9d7a3a';
+    ctx.font = 'bold 12px "Segoe UI"';
+    ctx.textAlign = 'left';
+    ctx.fillText(`🔨 BUILD MODE  ${lbl.emoji} ${lbl.name}  ×${count}`, 8, CANVAS_H - 22);
+    ctx.fillStyle = '#c4a56b';
+    ctx.font = '10px "Segoe UI"';
+    ctx.fillText(`[ / ] pick    F place    B exit    (${gs.buildIdx + 1}/${STRUCTURE_KINDS.length})`, 8, CANVAS_H - 7);
+  }
+
+  // F-prompt: tree / rock / water / placed-house indicator. Trees take
+  // priority (matches the F-press handler order above), then rocks, then
+  // water. A placed house in front of Addie wins over all of these so she
+  // can enter even if a tree happens to be adjacent on another side.
+  const dxF = gs.facing === 'left' ? -1 : gs.facing === 'right' ? 1 : 0;
+  const dyF = gs.facing === 'up' ? -1 : gs.facing === 'down' ? 1 : 0;
+  const ftxF = Math.floor(gs.px) + dxF, ftyF = Math.floor(gs.py) + dyF;
+  const housePlaced = gs.state.placedStructures[`${gs.zoneId}:${ftxF},${ftyF}`] === 'house';
   const treeIsStanding = (key: string) => isTreeStanding(gs.state, key);
   const rockIsIntact = (key: string) => isRockIntact(gs.state, key);
   const tree = adjacentToTree(map, gs.px, gs.py, treeIsStanding, gs.zoneId);
   const rock = !tree ? adjacentToRock(map, gs.px, gs.py, rockIsIntact, gs.zoneId) : null;
   const water = adjacentToWater(map, gs.px, gs.py);
-  if (tree && !gs.fishing) {
+  if (gs.buildMode) {
+    // Build mode owns the prompt area via its HUD; skip normal F-prompts.
+  } else if (housePlaced && !gs.fishing) {
+    const fx = ftxF * TS - camX + TS / 2, fy = ftyF * TS - camY - 12;
+    drawFPrompt(ctx, fx, fy, "F: Enter 🏠");
+  } else if (tree && !gs.fishing) {
     const fx = tree.x * TS - camX + TS / 2, fy = tree.y * TS - camY - 12;
     drawFPrompt(ctx, fx, fy, gs.state.inventory.cut > 0 ? "F: Chop 🪵" : "F: Need Cut HM");
   } else if (rock && !gs.fishing) {
@@ -787,6 +967,110 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   } else if (water && !gs.fishing) {
     const fx = water.x * TS - camX + TS / 2, fy = water.y * TS - camY - 12;
     drawFPrompt(ctx, fx, fy, gs.state.inventory.rod > 0 ? "F: Fish 🎣" : "F: Scoop 💧");
+  }
+}
+
+// ─── PLACED STRUCTURES ────────────────────────────────────────────────────────
+// Each kind has a tiny per-tile sprite. They share a soft drop shadow so
+// they read as sitting on the grass rather than floating above it.
+function drawPlacedStructure(ctx: CanvasRenderingContext2D, kind: StructureKind, sx: number, sy: number) {
+  ctx.fillStyle = 'rgba(0,0,0,0.22)';
+  ctx.beginPath();
+  ctx.ellipse(sx + 16, sy + 28, 11, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  switch (kind) {
+    case 'fence': {
+      ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 2, sy + 18, 28, 3);
+      ctx.fillRect(sx + 2, sy + 24, 28, 3);
+      ctx.fillStyle = '#6e4218';
+      for (let i = 0; i < 4; i++) ctx.fillRect(sx + 4 + i * 8, sy + 12, 3, 16);
+      break;
+    }
+    case 'path_tile': {
+      ctx.fillStyle = '#b8a888'; ctx.fillRect(sx + 2, sy + 2, TS - 4, TS - 4);
+      ctx.fillStyle = '#9a8a6a';
+      ctx.fillRect(sx + 5, sy + 6, 4, 3); ctx.fillRect(sx + 14, sy + 12, 5, 3);
+      ctx.fillRect(sx + 22, sy + 20, 4, 3); ctx.fillRect(sx + 8, sy + 22, 3, 3);
+      break;
+    }
+    case 'sign': {
+      ctx.fillStyle = '#6e4218'; ctx.fillRect(sx + 15, sy + 16, 2, 12);
+      ctx.fillStyle = '#c08a44'; ctx.fillRect(sx + 8, sy + 8, 16, 10);
+      ctx.fillStyle = '#3a2410'; ctx.fillRect(sx + 10, sy + 11, 3, 1);
+      ctx.fillRect(sx + 14, sy + 11, 6, 1); ctx.fillRect(sx + 10, sy + 14, 8, 1);
+      break;
+    }
+    case 'flower_pot': {
+      ctx.fillStyle = '#a05a3a'; ctx.fillRect(sx + 10, sy + 18, 12, 10);
+      ctx.fillStyle = '#8a4a2a'; ctx.fillRect(sx + 10, sy + 18, 12, 2);
+      ctx.fillStyle = '#3aa53a';
+      ctx.fillRect(sx + 13, sy + 12, 2, 6); ctx.fillRect(sx + 17, sy + 12, 2, 6);
+      ctx.fillStyle = '#ff6fa0'; ctx.beginPath(); ctx.arc(sx + 14, sy + 11, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.arc(sx + 19, sy + 11, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(sx + 14, sy + 11, 1, 1); ctx.fillRect(sx + 19, sy + 11, 1, 1);
+      break;
+    }
+    case 'lantern': {
+      ctx.fillStyle = '#3a2410'; ctx.fillRect(sx + 15, sy + 20, 2, 8);
+      ctx.fillStyle = '#a02a2a'; ctx.fillRect(sx + 10, sy + 10, 12, 10);
+      ctx.fillStyle = '#3a2410'; ctx.fillRect(sx + 10, sy + 10, 12, 1); ctx.fillRect(sx + 10, sy + 19, 12, 1);
+      ctx.fillStyle = '#ffe082'; ctx.fillRect(sx + 12, sy + 12, 8, 6);
+      const glow = 0.4 + Math.sin(Date.now() / 280) * 0.2;
+      ctx.fillStyle = `rgba(255,224,130,${glow})`;
+      ctx.beginPath(); ctx.arc(sx + 16, sy + 15, 10, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'sapling': {
+      ctx.fillStyle = '#6e4218'; ctx.fillRect(sx + 15, sy + 22, 2, 4);
+      ctx.fillStyle = '#3aa53a';
+      ctx.beginPath(); ctx.arc(sx + 16, sy + 20, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6dc25b';
+      ctx.beginPath(); ctx.arc(sx + 14, sy + 18, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 18, sy + 19, 2, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'berry_tree': {
+      ctx.fillStyle = '#6b4226'; ctx.fillRect(sx + 14, sy + 18, 4, 10);
+      ctx.fillStyle = '#2e8a3a';
+      ctx.beginPath(); ctx.arc(sx + 16, sy + 12, 10, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff4a6a';
+      ctx.beginPath(); ctx.arc(sx + 11, sy + 11, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 19, sy + 9, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(sx + 16, sy + 16, 2, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+    case 'statue': {
+      ctx.fillStyle = '#5a5a5e'; ctx.fillRect(sx + 8, sy + 24, 16, 4);
+      ctx.fillStyle = '#7a7a7e'; ctx.fillRect(sx + 11, sy + 10, 10, 14);
+      ctx.fillStyle = '#9a9a9e'; ctx.beginPath(); ctx.arc(sx + 16, sy + 9, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a3a3e'; ctx.fillRect(sx + 13, sy + 14, 6, 2);
+      break;
+    }
+    case 'bridge': {
+      ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 1, sy + 6, TS - 2, TS - 12);
+      ctx.fillStyle = '#6e4218';
+      for (let i = 0; i < 5; i++) ctx.fillRect(sx + 2 + i * 6, sy + 6, 1, TS - 12);
+      ctx.fillRect(sx + 1, sy + 6, TS - 2, 1); ctx.fillRect(sx + 1, sy + TS - 7, TS - 2, 1);
+      break;
+    }
+    case 'house': {
+      ctx.fillStyle = '#c08a44'; ctx.fillRect(sx + 4, sy + 14, 24, 14);
+      ctx.fillStyle = '#a06a30'; ctx.fillRect(sx + 4, sy + 14, 24, 2);
+      ctx.fillStyle = '#d63a3a';
+      ctx.beginPath();
+      ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 4);
+      ctx.lineTo(sx + 30, sy + 14); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8a2424';
+      ctx.beginPath();
+      ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 4); ctx.lineTo(sx + 16, sy + 6);
+      ctx.lineTo(sx + 4, sy + 15); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#3a2410'; ctx.fillRect(sx + 14, sy + 19, 4, 9);
+      ctx.fillStyle = '#ffd54a'; ctx.fillRect(sx + 16, sy + 22, 1, 1);
+      ctx.fillStyle = '#9ed4ff'; ctx.fillRect(sx + 7, sy + 17, 4, 4); ctx.fillRect(sx + 21, sy + 17, 4, 4);
+      ctx.strokeStyle = '#3a2410'; ctx.lineWidth = 1;
+      ctx.strokeRect(sx + 7.5, sy + 17.5, 3, 3); ctx.strokeRect(sx + 21.5, sy + 17.5, 3, 3);
+      break;
+    }
   }
 }
 

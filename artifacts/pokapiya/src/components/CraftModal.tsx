@@ -19,36 +19,54 @@ interface Recipe {
 
 const RECIPES: Recipe[] = [
   {
-    id: 'fence',
-    name: 'Wooden Fence',
-    emoji: '🪵',
+    id: 'fence', name: 'Wooden Fence', emoji: '🪵',
     description: 'A short wooden fence. Place it in the world (press B in the map).',
-    cost: '2 🪵 Lumber',
-    reward: '+1 🪵 Fence (place it!)',
+    cost: '2 🪵 Lumber', reward: '+1 Fence',
   },
   {
-    id: 'path',
-    name: 'Stone Path Tile',
-    emoji: '🪨',
-    description: 'A polished stone path tile. Lay it down to make your own paths.',
-    cost: '2 🪨 Stone',
-    reward: '+1 🪨 Path tile (place it!)',
+    id: 'path', name: 'Stone Path Tile', emoji: '🪨',
+    description: 'Polished stone path tile. Lay it down to make your own paths.',
+    cost: '2 🪨 Stone', reward: '+1 Path tile',
   },
   {
-    id: 'berry-tree',
-    name: 'Berry Tree',
-    emoji: '🌳',
+    id: 'sign', name: 'Sign Post', emoji: '🪧',
+    description: 'A cute little sign to mark special places around town.',
+    cost: '1 🪵 Lumber', reward: '+1 Sign',
+  },
+  {
+    id: 'flower-pot', name: 'Flower Pot', emoji: '🌷',
+    description: 'Pretty potted flowers to decorate paths and houses.',
+    cost: '1 🌱 Seed + 1 🪨 Stone', reward: '+1 Flower pot',
+  },
+  {
+    id: 'lantern', name: 'Lantern', emoji: '🏮',
+    description: 'Warm glowing lantern. Looks lovely at night.',
+    cost: '1 ⚙️ Metal + 1 🪨 Stone', reward: '+1 Lantern',
+  },
+  {
+    id: 'sapling', name: 'Sapling', emoji: '🌱',
+    description: 'A tiny seedling. Free when a Grass-type Pokémon is in your party (Plant move).',
+    cost: '1 🌱 Seed (free w/ Grass-type)', reward: '+1 Sapling',
+  },
+  {
+    id: 'berry-tree', name: 'Berry Tree', emoji: '🍓',
     description: 'A young berry tree to plant in the world.',
-    cost: '1 🌱 Seed + 1 🪵 Lumber',
-    reward: '+1 🌳 Berry Tree (plant it!)',
+    cost: '1 🌱 Seed + 1 🪵 Lumber', reward: '+1 Berry Tree',
   },
   {
-    id: 'house',
-    name: 'Little House',
-    emoji: '🏠',
-    description: 'A cozy little house with a red roof. Build it anywhere on grass.',
-    cost: '8 🪵 Lumber + 4 🪨 Stone + 1 ⚙️ Metal',
-    reward: '+1 🏠 House (build it!)',
+    id: 'statue', name: 'Stone Statue', emoji: '🗿',
+    description: 'A handsome stone statue for the town square.',
+    cost: '6 🪨 Stone', reward: '+1 Statue',
+  },
+  {
+    id: 'bridge', name: 'Wooden Bridge', emoji: '🌉',
+    description: 'Lay across grass to make a fancy walkway.',
+    cost: '4 🪵 Lumber', reward: '+1 Bridge',
+  },
+  {
+    id: 'house', name: 'Cozy House', emoji: '🏠',
+    description: 'A house with a red roof. Walk up + press F to step inside!',
+    cost: '8 🪵 Lumber + 4 🪨 Stone + 1 ⚙️ Metal', reward: '+1 House',
   },
 ];
 
