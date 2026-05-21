@@ -84,6 +84,9 @@ interface GameState {
   bJustPressed: boolean;
   bracketLeftJust: boolean;
   bracketRightJust: boolean;
+  // Number-key (1-9, 0) jump-to-slot for build mode. 1..9 → slots 0..8,
+  // 0 → slot 9 (Cozy House). Far easier for Addie than [/] cycling.
+  slotJustPressed: number | null;
   // Build mode lets Addie place crafted structures from her inventory onto
   // the tile she's facing. Toggled with B. While buildMode is true, F
   // places the selected structure instead of chopping/mining.
@@ -176,7 +179,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       camX: 0, camY: 0,
       keys: new Set(),
       fJustPressed: false, spaceJustPressed: false,
-      bJustPressed: false, bracketLeftJust: false, bracketRightJust: false,
+      bJustPressed: false, bracketLeftJust: false, bracketRightJust: false, slotJustPressed: null,
       buildMode: false, buildIdx: 0,
       encounterCooldown: 0,
       lastTileKey: '',
@@ -239,6 +242,8 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
         if (k === '[') gs.bracketLeftJust = true;
         if (k === ']') gs.bracketRightJust = true;
         if (k === 'escape' && gs.buildMode) gs.buildMode = false;
+        // Number-row slot picker — 1..9 select slots 0..8, 0 selects slot 9.
+        if (/^[0-9]$/.test(k)) gs.slotJustPressed = k === '0' ? 9 : parseInt(k, 10) - 1;
       }
       gs.keys.add(k);
     };
@@ -363,6 +368,20 @@ function update(
     gs.bracketRightJust = false;
     if (gs.buildMode) {
       gs.buildIdx = (gs.buildIdx + 1) % STRUCTURE_KINDS.length;
+    }
+  }
+  // Number key directly picks a slot. Auto-enters build mode if she's not
+  // already in it, so a kid can just tap "1" and start placing fences.
+  if (gs.slotJustPressed !== null) {
+    const slot = gs.slotJustPressed;
+    gs.slotJustPressed = null;
+    if (slot >= 0 && slot < STRUCTURE_KINDS.length) {
+      gs.buildIdx = slot;
+      if (!gs.buildMode) {
+        gs.buildMode = true;
+        const lbl = STRUCTURE_LABEL[STRUCTURE_KINDS[slot]];
+        onToast(`🔨 Build mode ON — picked ${lbl.emoji} ${lbl.name}. Press F to place!`);
+      }
     }
   }
 
@@ -924,20 +943,81 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
       ctx.globalAlpha = 1;
     }
 
-    // HUD strip across the bottom.
-    const hudH = 38;
-    ctx.fillStyle = 'rgba(10,6,2,0.92)';
-    ctx.fillRect(0, CANVAS_H - hudH, CANVAS_W, hudH);
+    // Visual icon bar across the bottom — one slot per placeable kind,
+    // with emoji, count, and number-key label. The selected slot pulses
+    // and shows the item's name above. A 6yo can scan the bar and press
+    // the matching number to pick.
+    const hudH = 56;
+    const hudY = CANVAS_H - hudH;
+    ctx.fillStyle = 'rgba(10,6,2,0.94)';
+    ctx.fillRect(0, hudY, CANVAS_W, hudH);
     ctx.strokeStyle = '#7c5a2a'; ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, CANVAS_H - hudH + 0.5, CANVAS_W - 1, hudH - 1);
+    ctx.strokeRect(0.5, hudY + 0.5, CANVAS_W - 1, hudH - 1);
+
+    const slotW = Math.floor((CANVAS_W - 16) / STRUCTURE_KINDS.length);
+    const slotH = 36;
+    const slotY = hudY + 16;
+    for (let i = 0; i < STRUCTURE_KINDS.length; i++) {
+      const sk = STRUCTURE_KINDS[i];
+      const sc = structureCountFor(gs.state, sk);
+      const sx = 8 + i * slotW;
+      const sel = i === gs.buildIdx;
+      const dim = sc <= 0;
+      // Slot background
+      ctx.fillStyle = sel ? `rgba(255,213,74,${0.18 + Math.sin(Date.now() / 220) * 0.08})` : 'rgba(255,255,255,0.05)';
+      ctx.fillRect(sx, slotY, slotW - 2, slotH);
+      ctx.strokeStyle = sel ? '#ffd54a' : '#5a4220';
+      ctx.lineWidth = sel ? 2 : 1;
+      ctx.strokeRect(sx + 0.5, slotY + 0.5, slotW - 3, slotH - 1);
+      // Emoji icon
+      ctx.globalAlpha = dim ? 0.4 : 1;
+      ctx.font = '20px "Segoe UI Emoji", "Segoe UI"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(STRUCTURE_LABEL[sk].emoji, sx + slotW / 2 - 6, slotY + slotH / 2);
+      ctx.globalAlpha = 1;
+      // Count badge (top-right)
+      ctx.font = 'bold 11px "Segoe UI"';
+      ctx.fillStyle = sc > 0 ? '#ffd54a' : '#7a5a2a';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillText(`×${sc}`, sx + slotW - 5, slotY + 3);
+      // Number key label (bottom-left)
+      ctx.font = 'bold 9px "Segoe UI"';
+      ctx.fillStyle = sel ? '#ffd54a' : '#8a6e3a';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(i === 9 ? '0' : `${i + 1}`, sx + 4, slotY + slotH - 3);
+    }
+    // Title line above the bar.
     const lbl = STRUCTURE_LABEL[kind];
-    ctx.fillStyle = count > 0 ? '#ffd54a' : '#9d7a3a';
-    ctx.font = 'bold 12px "Segoe UI"';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = 'bold 11px "Segoe UI"';
+    ctx.fillStyle = count > 0 ? '#ffd54a' : '#c97a5a';
     ctx.textAlign = 'left';
-    ctx.fillText(`🔨 BUILD MODE  ${lbl.emoji} ${lbl.name}  ×${count}`, 8, CANVAS_H - 22);
-    ctx.fillStyle = '#c4a56b';
-    ctx.font = '10px "Segoe UI"';
-    ctx.fillText(`[ / ] pick    F place    B exit    (${gs.buildIdx + 1}/${STRUCTURE_KINDS.length})`, 8, CANVAS_H - 7);
+    ctx.fillText(`🔨 ${lbl.emoji} ${lbl.name} — ${count > 0 ? 'press F to place' : "you don't have any — craft one (C)"}`, 8, hudY + 12);
+    ctx.fillStyle = '#9d7a3a';
+    ctx.textAlign = 'right';
+    ctx.fillText('press B to exit', CANVAS_W - 8, hudY + 12);
+  } else {
+    // Soft hint when not in build mode: tiny pill in the bottom-right
+    // reminding Addie that 1–9, 0 picks a buildable.
+    const totalPlaceable = STRUCTURE_KINDS.reduce((s, k) => s + structureCountFor(gs.state, k), 0);
+    if (totalPlaceable > 0) {
+      const pillW = 168, pillH = 18;
+      const px = CANVAS_W - pillW - 6, py = CANVAS_H - pillH - 6;
+      ctx.fillStyle = 'rgba(10,6,2,0.78)';
+      ctx.fillRect(px, py, pillW, pillH);
+      ctx.strokeStyle = '#7c5a2a'; ctx.lineWidth = 1;
+      ctx.strokeRect(px + 0.5, py + 0.5, pillW - 1, pillH - 1);
+      ctx.font = 'bold 10px "Segoe UI"';
+      ctx.fillStyle = '#ffd54a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🔨 press 1–9 or B to build', px + pillW / 2, py + pillH / 2);
+      ctx.textBaseline = 'alphabetic';
+    }
   }
 
   // F-prompt: tree / rock / water / placed-house indicator. Trees take
