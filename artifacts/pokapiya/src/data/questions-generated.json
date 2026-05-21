@@ -2874,6 +2874,320 @@
         "answerIndex": 0,
         "hint": "Read the last sentence."
       }
+    ],
+    "family": [
+      {
+        "subject": "Addie's Home",
+        "prompt": "What is Addie's full home address?",
+        "choices": [
+          "1108 S. 36th Place, Renton WA 98055",
+          "1180 S. 63rd Place, Renton WA 98055",
+          "1108 N. 36th Street, Renton WA 98058",
+          "8801 S. 36th Place, Seattle WA 98055"
+        ],
+        "answerIndex": 0,
+        "hint": "It starts with one-one-zero-eight."
+      },
+      {
+        "subject": "Addie's Home",
+        "prompt": "What city does Addie live in?",
+        "choices": [
+          "Renton",
+          "Seattle",
+          "Tacoma",
+          "Bellevue"
+        ],
+        "answerIndex": 0,
+        "hint": "It rhymes with 'Benton'."
+      },
+      {
+        "subject": "Addie's Home",
+        "prompt": "What state does Addie live in?",
+        "choices": [
+          "Washington",
+          "Oregon",
+          "California",
+          "Idaho"
+        ],
+        "answerIndex": 0,
+        "hint": "WA is short for this state."
+      },
+      {
+        "subject": "Addie's Home",
+        "prompt": "What is Addie's house number?",
+        "choices": [
+          "1108",
+          "8011",
+          "1180",
+          "1018"
+        ],
+        "answerIndex": 0,
+        "hint": "One-one-zero-eight."
+      },
+      {
+        "subject": "Addie's Home",
+        "prompt": "What street does Addie live on?",
+        "choices": [
+          "S. 36th Place",
+          "N. 36th Street",
+          "S. 63rd Place",
+          "S. 36th Avenue"
+        ],
+        "answerIndex": 0,
+        "hint": "South, thirty-sixth, Place."
+      },
+      {
+        "subject": "Addie's Home",
+        "prompt": "What is Addie's ZIP code?",
+        "choices": [
+          "98055",
+          "98058",
+          "98005",
+          "98155"
+        ],
+        "answerIndex": 0,
+        "hint": "Nine-eight-zero-five-five."
+      },
+      {
+        "subject": "Daddy's Phone",
+        "prompt": "What is Daddy's phone number?",
+        "choices": [
+          "253-203-5143",
+          "253-241-1334",
+          "253-230-5413",
+          "206-203-5143"
+        ],
+        "answerIndex": 0,
+        "hint": "Two-five-three, two-zero-three, five-one-four-three."
+      },
+      {
+        "subject": "Daddy's Phone",
+        "prompt": "What is the area code for Addie's family?",
+        "choices": [
+          "253",
+          "206",
+          "425",
+          "360"
+        ],
+        "answerIndex": 0,
+        "hint": "Two-five-three."
+      },
+      {
+        "subject": "Daddy's Phone",
+        "prompt": "Daddy's number starts with 253. What comes next?",
+        "choices": [
+          "203",
+          "230",
+          "302",
+          "241"
+        ],
+        "answerIndex": 0,
+        "hint": "Two-zero-three."
+      },
+      {
+        "subject": "Daddy's Phone",
+        "prompt": "Daddy's number ends with what four digits?",
+        "choices": [
+          "5143",
+          "1334",
+          "5413",
+          "5134"
+        ],
+        "answerIndex": 0,
+        "hint": "Five-one-four-three."
+      },
+      {
+        "subject": "Mommy's Phone",
+        "prompt": "What is Mommy's phone number?",
+        "choices": [
+          "253-241-1334",
+          "253-203-5143",
+          "253-214-1334",
+          "253-241-3134"
+        ],
+        "answerIndex": 0,
+        "hint": "Two-five-three, two-four-one, one-three-three-four."
+      },
+      {
+        "subject": "Mommy's Phone",
+        "prompt": "Mommy's number starts with 253. What comes next?",
+        "choices": [
+          "241",
+          "214",
+          "203",
+          "421"
+        ],
+        "answerIndex": 0,
+        "hint": "Two-four-one."
+      },
+      {
+        "subject": "Mommy's Phone",
+        "prompt": "Mommy's number ends with what four digits?",
+        "choices": [
+          "1334",
+          "1343",
+          "3134",
+          "5143"
+        ],
+        "answerIndex": 0,
+        "hint": "One-three-three-four."
+      },
+      {
+        "subject": "Daddy's Name",
+        "prompt": "What is Daddy's full name?",
+        "choices": [
+          "Rodelio Doria",
+          "Roberto Doria",
+          "Rodrigo Doria",
+          "Rodelio Dorio"
+        ],
+        "answerIndex": 0,
+        "hint": "Ro-de-li-o Do-ri-a."
+      },
+      {
+        "subject": "Daddy's Name",
+        "prompt": "How do you spell Daddy's first name?",
+        "choices": [
+          "R-O-D-E-L-I-O",
+          "R-O-D-I-L-E-O",
+          "R-O-D-E-L-L-O",
+          "R-O-D-E-L-I-A"
+        ],
+        "answerIndex": 0,
+        "hint": "R, O, D, E, L, I, O."
+      },
+      {
+        "subject": "Daddy's Name",
+        "prompt": "How do you spell Daddy's last name?",
+        "choices": [
+          "D-O-R-I-A",
+          "D-O-R-I-O",
+          "D-O-R-A-I",
+          "D-O-R-R-I-A"
+        ],
+        "answerIndex": 0,
+        "hint": "D, O, R, I, A."
+      },
+      {
+        "subject": "Mommy's Name",
+        "prompt": "What is Mommy's full name?",
+        "choices": [
+          "Kim Pham",
+          "Kim Pam",
+          "Kimberly Pham",
+          "Kim Pho"
+        ],
+        "answerIndex": 0,
+        "hint": "Kim, then Pham (sounds like 'fam')."
+      },
+      {
+        "subject": "Mommy's Name",
+        "prompt": "How do you spell Mommy's first name?",
+        "choices": [
+          "K-I-M",
+          "C-I-M",
+          "K-Y-M",
+          "K-I-M-M"
+        ],
+        "answerIndex": 0,
+        "hint": "Just three letters: K, I, M."
+      },
+      {
+        "subject": "Mommy's Name",
+        "prompt": "How do you spell Mommy's last name?",
+        "choices": [
+          "P-H-A-M",
+          "F-A-M",
+          "P-A-H-M",
+          "P-H-A-N"
+        ],
+        "answerIndex": 0,
+        "hint": "P, H, A, M — it sounds like 'fam'."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "If Addie gets lost, who should she call first?",
+        "choices": [
+          "Mommy or Daddy",
+          "A stranger",
+          "Nobody, just hide",
+          "Wait until tomorrow"
+        ],
+        "answerIndex": 0,
+        "hint": "Always call a grown-up who loves you."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "If Addie is lost in a store, what should she do?",
+        "choices": [
+          "Find a worker (someone with a name tag) and ask for help",
+          "Walk outside to look for the car",
+          "Hide under the clothes rack",
+          "Take a candy bar and wait"
+        ],
+        "answerIndex": 0,
+        "hint": "Workers wear name tags and can help kids find parents."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "If Addie can't find Mommy or Daddy, who is also safe to ask for help?",
+        "choices": [
+          "A police officer",
+          "Anyone in a car",
+          "Whoever has candy",
+          "The first kid you see"
+        ],
+        "answerIndex": 0,
+        "hint": "Officers wear a badge and a uniform."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "What should Addie do if a stranger says 'come with me'?",
+        "choices": [
+          "Yell NO and run to a safe grown-up",
+          "Follow them quietly",
+          "Go if they have a puppy",
+          "Get in their car"
+        ],
+        "answerIndex": 0,
+        "hint": "Yell NO, run, tell."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "What number do you call for emergencies?",
+        "choices": [
+          "911",
+          "411",
+          "611",
+          "119"
+        ],
+        "answerIndex": 0,
+        "hint": "Nine-one-one."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "If Addie is lost outside, what is the BEST thing to do first?",
+        "choices": [
+          "Stay where you are and call out for Mommy or Daddy",
+          "Run as fast as you can",
+          "Hide and don't make a sound",
+          "Walk far away to find them"
+        ],
+        "answerIndex": 0,
+        "hint": "Stay put — it's easier for grown-ups to find you."
+      },
+      {
+        "subject": "Stay Safe",
+        "prompt": "If someone asks where Addie lives, what should she say?",
+        "choices": [
+          "1108 S. 36th Place, Renton WA 98055",
+          "I don't know",
+          "Far away",
+          "On a Pokémon island"
+        ],
+        "answerIndex": 0,
+        "hint": "Say your real address so grown-ups can take you home."
+      }
     ]
   }
 }
