@@ -16,13 +16,32 @@ export function homeSpriteUrl(id: number, shiny = false) {
   return `${HOME_BASE}${shiny ? '/shiny' : ''}/${id}.png`;
 }
 
-// Eagerly fetch HOME renders (with pixel fallback) so the battle screen
-// doesn't pop in. Safe to call repeatedly — the browser cache dedupes.
+// PokeAPI's Gen-5 Black/White animated sprites — idle-breathing GIFs used in
+// the battle screen so wild and player Pokémon visibly bob/blink instead of
+// sitting as a static render. Only ids 1–649 have animated frames; callers
+// should fall back to HOME/pixel for anything past that.
+export const ANIMATED_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated';
+export function hasAnimatedSprite(id: number) {
+  return id > 0 && id <= 649;
+}
+export function animatedSpriteUrl(id: number, back = false, shiny = false) {
+  const dir = `${ANIMATED_BASE}${shiny ? '/shiny' : ''}${back ? '/back' : ''}`;
+  return `${dir}/${id}.gif`;
+}
+
+// Eagerly fetch animated + HOME renders (with pixel fallback) so the battle
+// screen doesn't pop in. Safe to call repeatedly — the browser cache dedupes.
 const preloaded = new Set<string>();
 export function preloadSprites(ids: number[]) {
   for (const id of ids) {
     if (!id || preloaded.has(`h${id}`)) continue;
     preloaded.add(`h${id}`);
+    if (hasAnimatedSprite(id)) {
+      const ani = new Image();
+      ani.src = animatedSpriteUrl(id);
+      const aniBack = new Image();
+      aniBack.src = animatedSpriteUrl(id, true);
+    }
     const home = new Image();
     home.src = homeSpriteUrl(id);
     home.onerror = () => {

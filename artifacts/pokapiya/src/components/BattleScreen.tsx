@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Pokemon } from '../data/pokedex';
-import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, wildLevelFor } from '../data/pokedex';
+import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, animatedSpriteUrl, hasAnimatedSprite, wildLevelFor } from '../data/pokedex';
 import { questionFor } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import {
@@ -531,15 +531,10 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
             transformOrigin: 'center bottom',
             filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
           }}>
-          <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
+          <BattleSprite id={wild.id} alt={displayName(wild)} style={{
             width: '100%', height: '100%',
             opacity: monVisible ? (caught ? 0 : 1) : 0,
             transition: 'opacity 0.3s',
-          }} onError={(e) => {
-            const img = e.currentTarget as HTMLImageElement;
-            img.onerror = null;
-            img.src = spriteUrl(wild.id);
-            img.style.imageRendering = 'pixelated';
           }} />
           {caught && (
             <div style={{
@@ -575,27 +570,10 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
             filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
           }}>
           {myMember && (
-            <img
-              src={homeSpriteUrl(myMember.id)}
-              alt={myMember.name}
-              style={{
-                width: '100%', height: '100%',
-                // Mirror so the polished HOME render faces the wild Pokémon
-                // up in the top-right instead of looking at the camera.
-                transform: 'scaleX(-1)',
-              }}
-              onError={(e) => {
-                const img = e.currentTarget as HTMLImageElement;
-                img.onerror = (() => {
-                  const img2 = img;
-                  img2.onerror = null;
-                  img2.src = spriteUrl(myMember.id);
-                  img2.style.imageRendering = 'pixelated';
-                }) as OnErrorEventHandler;
-                img.src = backSpriteUrl(myMember.id);
-                img.style.imageRendering = 'pixelated';
-              }}
-            />
+            <BattleSprite id={myMember.id} back alt={myMember.name} style={{
+              width: '100%', height: '100%',
+            }} />
+
           )}
           </div>
         </div>
@@ -1080,10 +1058,10 @@ function SendOutIntro({ message, addieLevel, wild }: {
           animation: 'popIn 0.4s ease-out 0.2s both',
         }}>VS</div>
         <div style={{ textAlign: 'center', animation: 'slideInRight 0.5s ease-out' }}>
-          <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
+          <BattleSprite id={wild.id} alt={displayName(wild)} style={{
             width: 180, height: 180,
             filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.35)) drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
-          }} onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(wild.id); img.style.imageRendering = 'pixelated'; }} />
+          }} />
           <div style={{ color: '#ffd54a', fontSize: 16, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
             {displayName(wild)}
           </div>
@@ -1095,6 +1073,51 @@ function SendOutIntro({ message, addieLevel, wild }: {
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
+  );
+}
+
+// Battle-area sprite with a graceful fallback chain so wild + player Pokémon
+// idle-animate when possible:
+//   front: animated Gen-5 GIF → HOME 3D render → pixel sprite
+//   back:  animated Gen-5 back GIF → pixel back sprite → pixel front sprite
+// Each stage advances on the previous img's onError. Skips the animated stage
+// outright for ids past Gen-5 where no animated source exists.
+function BattleSprite({
+  id, back = false, alt, style, className,
+}: {
+  id: number; back?: boolean; alt: string;
+  style?: React.CSSProperties; className?: string;
+}) {
+  const initial: 0 | 1 | 2 = hasAnimatedSprite(id) ? 0 : 1;
+  const [stage, setStage] = useState<0 | 1 | 2>(initial);
+  // Reset to the best available source whenever the species changes.
+  useEffect(() => { setStage(hasAnimatedSprite(id) ? 0 : 1); }, [id]);
+
+  let src: string;
+  let pixelated: boolean;
+  if (stage === 0) {
+    src = animatedSpriteUrl(id, back);
+    pixelated = true; // 96px source, scaled up
+  } else if (stage === 1) {
+    src = back ? backSpriteUrl(id) : homeSpriteUrl(id);
+    pixelated = back; // HOME is hi-res; back pixel sprite stays crisp
+  } else {
+    src = spriteUrl(id);
+    pixelated = true;
+  }
+
+  return (
+    <img
+      key={`${id}-${stage}`}
+      src={src}
+      alt={alt}
+      className={className}
+      style={{
+        ...style,
+        imageRendering: pixelated ? 'pixelated' : style?.imageRendering,
+      }}
+      onError={() => setStage((s) => (s < 2 ? ((s + 1) as 0 | 1 | 2) : s))}
+    />
   );
 }
 
