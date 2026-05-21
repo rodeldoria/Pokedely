@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getLevel, xpToNextLevel, type TrainerState } from '../game/save';
 import { subscribeCloudStatus, type CloudStatus } from '../game/cloudSave';
+import { liveSpriteUrl, spriteUrl } from '../data/pokedex';
 
 interface Props {
   state: TrainerState;
@@ -115,9 +116,14 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
                 overflow: 'hidden',
               }}>
                 <img
-                  src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${m.id}.png`}
+                  src={liveSpriteUrl(m.id)}
                   alt={m.name}
-                  style={{ width: 36, height: 36, imageRendering: 'pixelated' }}
+                  style={{ width: 40, height: 40, imageRendering: 'pixelated', objectFit: 'contain' }}
+                  onError={(e) => {
+                    const img = e.currentTarget as HTMLImageElement;
+                    img.onerror = null;
+                    img.src = spriteUrl(m.id);
+                  }}
                 />
               </div>
             ))}

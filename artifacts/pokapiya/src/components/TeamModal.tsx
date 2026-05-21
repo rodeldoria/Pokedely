@@ -1,5 +1,5 @@
 import type { TrainerState } from '../game/save';
-import { displayName, homeSpriteUrl, spriteUrl } from '../data/pokedex';
+import { displayName, liveSpriteUrl, spriteUrl } from '../data/pokedex';
 
 interface Props {
   state: TrainerState;
@@ -50,14 +50,13 @@ export default function TeamModal({ state, onClose }: Props) {
                 {member ? (
                   <>
                     <img
-                      src={homeSpriteUrl(member.id)}
+                      src={liveSpriteUrl(member.id)}
                       alt={member.name}
-                      style={{ width: 64, height: 64 }}
+                      style={{ width: 72, height: 72, imageRendering: 'pixelated', objectFit: 'contain' }}
                       onError={(e) => {
                         const img = e.currentTarget as HTMLImageElement;
                         img.onerror = null;
                         img.src = spriteUrl(member.id);
-                        img.style.imageRendering = 'pixelated';
                       }}
                     />
                     <div>

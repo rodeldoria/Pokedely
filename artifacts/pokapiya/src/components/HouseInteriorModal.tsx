@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { TrainerState } from '../game/save';
 import { save } from '../game/save';
-import { byId, spriteUrl, displayName } from '../data/pokedex';
+import { byId, spriteUrl, liveSpriteUrl, displayName } from '../data/pokedex';
 import { AddieSprite } from './AddieSprite';
 
 interface Props {
@@ -131,11 +131,16 @@ export default function HouseInteriorModal({ state, houseKey, onChange, onClose 
               position: 'absolute', bottom: 14, right: 110,
             }}>
               <img
-                src={spriteUrl(resident.id)}
+                src={liveSpriteUrl(resident.id)}
                 alt={displayName(resident)}
                 style={{
-                  width: 64, height: 64, imageRendering: 'pixelated',
+                  width: 72, height: 72, imageRendering: 'pixelated', objectFit: 'contain',
                   filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.4))',
+                }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = spriteUrl(resident.id);
                 }}
               />
             </div>
@@ -148,7 +153,8 @@ export default function HouseInteriorModal({ state, houseKey, onChange, onClose 
           </div>
           {resident ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <img src={spriteUrl(resident.id)} alt="" style={{ width: 36, height: 36, imageRendering: 'pixelated' }} />
+              <img src={liveSpriteUrl(resident.id)} alt="" style={{ width: 40, height: 40, imageRendering: 'pixelated', objectFit: 'contain' }}
+                onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(resident.id); }} />
               <div style={{ flex: 1 }}>
                 <b>{displayName(resident)}</b> lives here and loves visits!
               </div>
@@ -201,7 +207,8 @@ export default function HouseInteriorModal({ state, houseKey, onChange, onClose 
                       fontSize: 12, fontWeight: 'bold',
                     }}
                   >
-                    <img src={spriteUrl(m.id)} alt="" style={{ width: 24, height: 24, imageRendering: 'pixelated' }} />
+                    <img src={liveSpriteUrl(m.id)} alt="" style={{ width: 28, height: 28, imageRendering: 'pixelated', objectFit: 'contain' }}
+                      onError={(e) => { const img = e.currentTarget as HTMLImageElement; img.onerror = null; img.src = spriteUrl(m.id); }} />
                     {displayName(mon)}
                   </button>
                 );

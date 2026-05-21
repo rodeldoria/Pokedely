@@ -29,6 +29,15 @@ export function animatedSpriteUrl(id: number, back = false, shiny = false) {
   return `${dir}/${id}.gif`;
 }
 
+// Single helper for every `<img>` that shows a Pokémon in the UI. Returns the
+// animated Gen-V GIF when one exists (idle bobs/blinks make the game feel
+// alive) and falls back to the HOME 3D render for newer Pokémon. Callers
+// should still provide an `onError → spriteUrl(id)` fallback for the rare
+// Pokémon whose animated frame is missing from the Black/White set.
+export function liveSpriteUrl(id: number, shiny = false) {
+  return hasAnimatedSprite(id) ? animatedSpriteUrl(id, false, shiny) : homeSpriteUrl(id, shiny);
+}
+
 // Eagerly fetch animated + HOME renders (with pixel fallback) so the battle
 // screen doesn't pop in. Safe to call repeatedly — the browser cache dedupes.
 const preloaded = new Set<string>();

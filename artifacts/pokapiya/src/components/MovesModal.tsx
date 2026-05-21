@@ -1,6 +1,6 @@
 import type { TrainerState } from '../game/save';
 import { FIELD_MOVES, teacherFor } from '../game/moves';
-import { displayName } from '../data/pokedex';
+import { displayName, liveSpriteUrl, spriteUrl } from '../data/pokedex';
 
 interface Props {
   state: TrainerState;
@@ -99,9 +99,14 @@ function MoveCard({
           {teacher ? (
             <>
               <img
-                src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${teacher.id}.png`}
+                src={liveSpriteUrl(teacher.id)}
                 alt={teacher.name}
-                style={{ width: 28, height: 28, imageRendering: 'pixelated' }}
+                style={{ width: 32, height: 32, imageRendering: 'pixelated', objectFit: 'contain' }}
+                onError={(e) => {
+                  const img = e.currentTarget as HTMLImageElement;
+                  img.onerror = null;
+                  img.src = spriteUrl(teacher.id);
+                }}
               />
               <span><b>{displayName(teacher)}</b> teaches this move.</span>
             </>

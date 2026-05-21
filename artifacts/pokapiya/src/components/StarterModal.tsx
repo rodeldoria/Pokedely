@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { STARTERS, type Starter } from '../data/starters';
 import { recordCatch, save, type TrainerState } from '../game/save';
-import { spriteUrl, homeSpriteUrl } from '../data/pokedex';
+import { spriteUrl, liveSpriteUrl } from '../data/pokedex';
 
 interface Props {
   state: TrainerState;
@@ -60,14 +60,13 @@ export default function StarterModal({ state, onPick }: Props) {
             }}
           >
             <img
-              src={homeSpriteUrl(s.id)}
+              src={liveSpriteUrl(s.id)}
               alt={s.name}
-              style={{ width: 72, height: 72, display: 'block', margin: 'auto' }}
+              style={{ width: 80, height: 80, display: 'block', margin: 'auto', imageRendering: 'pixelated', objectFit: 'contain' }}
               onError={(e) => {
                 const img = e.currentTarget as HTMLImageElement;
                 img.onerror = null;
                 img.src = spriteUrl(s.id);
-                img.style.imageRendering = 'pixelated';
               }}
             />
             <div style={{
@@ -86,14 +85,13 @@ export default function StarterModal({ state, onPick }: Props) {
         boxShadow: `0 10px 30px ${show.color}33`,
       }}>
         <img
-          src={homeSpriteUrl(show.id)}
+          src={liveSpriteUrl(show.id)}
           alt={show.name}
-          style={{ width: 180, height: 180 }}
+          style={{ width: 200, height: 200, imageRendering: 'pixelated', objectFit: 'contain' }}
           onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             img.onerror = null;
             img.src = spriteUrl(show.id);
-            img.style.imageRendering = 'pixelated';
           }}
         />
         <h2 style={{ color: show.color, margin: '4px 0' }}>{show.name}</h2>

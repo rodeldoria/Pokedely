@@ -7,8 +7,10 @@ interface Props {
   onCancel: () => void;
 }
 
+import { liveSpriteUrl, spriteUrl } from '../data/pokedex';
+
 function sprite(id: number) {
-  return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+  return liveSpriteUrl(id);
 }
 
 export default function EvolutionModal({ pending, onEvolve, onCancel }: Props) {
@@ -120,7 +122,12 @@ function SpriteCard({ id, name, big }: { id: number; name: string; big?: boolean
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <img src={sprite(id)} alt={name}
-          style={{ width: size, height: size, imageRendering: 'pixelated' }} />
+          style={{ width: size, height: size, imageRendering: 'pixelated', objectFit: 'contain' }}
+          onError={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            img.onerror = null;
+            img.src = spriteUrl(id);
+          }} />
       </div>
       <div style={{ color: '#ffd54a', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
         {name}

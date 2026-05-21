@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { byId, spriteUrl, homeSpriteUrl, displayName } from '../data/pokedex';
+import { byId, spriteUrl, liveSpriteUrl, displayName } from '../data/pokedex';
 import { save, type TrainerState } from '../game/save';
 
 interface Props {
@@ -151,13 +151,12 @@ function Slot({ mon, sel, onClick, action, actionLabel }: {
     }} onClick={onClick}>
       {mon ? (
         <>
-          <img src={homeSpriteUrl(mon.id)} alt={mon.name}
-            style={{ width: 64, height: 64 }}
+          <img src={liveSpriteUrl(mon.id)} alt={mon.name}
+            style={{ width: 72, height: 72, imageRendering: 'pixelated', objectFit: 'contain' }}
             onError={(e) => {
               const img = e.currentTarget as HTMLImageElement;
               img.onerror = null;
               img.src = spriteUrl(mon.id);
-              img.style.imageRendering = 'pixelated';
             }} />
           <div style={{ color: '#1a1f44', fontSize: '11px', fontWeight: 'bold' }}>
             {displayName(mon)}
