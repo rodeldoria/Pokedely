@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, adjacentToRock, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
 import { spriteUrl, pickRandom, byId, pickByType, pickForZone, maxDexForLevel, displayName, type Pokemon } from '../data/pokedex';
 import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeStanding, isRockIntact, setZone, getLevel, type TrainerState } from '../game/save';
+import { getTrainerPortrait, preloadAllTrainerPortraits } from './TrainerSprite';
 
 const TS = 32;
 const CANVAS_W = 960;
@@ -131,6 +132,8 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    preloadAllTrainerPortraits();
 
     const trainerState = stateRef.current;
     const initialZone: ZoneId = trainerState.currentZone || 'town';
@@ -1160,26 +1163,21 @@ function drawTrainerNPC(ctx: CanvasRenderingContext2D, t: TrainerNPC, sx: number
   ctx.fillStyle = 'rgba(0,0,0,0.32)';
   ctx.beginPath(); ctx.ellipse(sx, sy + 16, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
 
-  const art = NPC_ART[t.kind] || NPC_CAMPER;
-  const palette = NPC_PALETTES[t.kind] || CAMPER_PALETTE;
-  const scale = 2;
-  const w = 14 * scale, h = 20 * scale;
-  drawPixelArt(ctx, art, palette, sx - w / 2, sy - h / 2 - 4, scale);
-
-  // Fisher's rod
-  if (t.kind === 'fisher') {
-    ctx.strokeStyle = '#5a3e1e'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(sx + 8, sy + 2); ctx.lineTo(sx + 22, sy - 18); ctx.stroke();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(sx + 22, sy - 18); ctx.lineTo(sx + 24, sy - 4); ctx.stroke();
-    ctx.fillStyle = '#d63946'; ctx.beginPath(); ctx.arc(sx + 24, sy - 3, 1.5, 0, Math.PI * 2); ctx.fill();
-  }
-
-  // Hiker's backpack hump
-  if (t.kind === 'hiker') {
-    ctx.fillStyle = '#5a3a1e';
-    ctx.beginPath(); ctx.roundRect(sx - 14, sy - 8, 6, 14, 2); ctx.fill();
-    ctx.strokeStyle = '#1a0d00'; ctx.lineWidth = 1; ctx.stroke();
+  // Prefer the rasterized chibi portrait (matches the battle VS intro).
+  // The portrait is loaded asynchronously; fall back to the pixel sprite
+  // for the first few frames if it isn't ready yet.
+  const portrait = getTrainerPortrait(t.kind);
+  if (portrait) {
+    // Portrait viewBox is 100×140; draw at ~36×50 so it sits naturally on
+    // a 32px tile without overwhelming nearby ambient Pokémon sprites.
+    const pw = 36, ph = 50;
+    ctx.drawImage(portrait, sx - pw / 2, sy - ph + 8, pw, ph);
+  } else {
+    const art = NPC_ART[t.kind] || NPC_CAMPER;
+    const palette = NPC_PALETTES[t.kind] || CAMPER_PALETTE;
+    const scale = 2;
+    const w = 14 * scale, h = 20 * scale;
+    drawPixelArt(ctx, art, palette, sx - w / 2, sy - h / 2 - 4, scale);
   }
 
   if (defeated) {

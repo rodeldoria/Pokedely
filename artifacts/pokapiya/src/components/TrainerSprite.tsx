@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { NPCTrainer } from '../game/world';
 
 type TrainerKind = NPCTrainer['kind'];
@@ -356,6 +357,47 @@ const KIND_RENDERERS: Record<TrainerKind, (props: { frame: 0 | 1 }) => React.JSX
   bug: Bug,
   lass: Lass,
 };
+
+// ─── Canvas portrait rasterization ──────────────────────────────────
+// The overworld canvas can't render React/SVG directly each frame, so we
+// rasterize each trainer-class portrait once into an HTMLImageElement and
+// cache it. Drawn in `GameCanvas.drawTrainerNPC`. Frame 0 is used (no
+// per-frame mounts), facing right by default so it can be flipped via
+// canvas transforms if needed.
+
+const PORTRAIT_CACHE: Partial<Record<TrainerKind, HTMLImageElement>> = {};
+const PORTRAIT_PENDING: Partial<Record<TrainerKind, Promise<HTMLImageElement>>> = {};
+
+function portraitSvgMarkup(kind: TrainerKind): string {
+  const Renderer = KIND_RENDERERS[kind];
+  const inner = renderToStaticMarkup(<Renderer frame={0} />);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 140" width="100" height="140">${inner}</svg>`;
+}
+
+export function getTrainerPortrait(kind: TrainerKind): HTMLImageElement | null {
+  return PORTRAIT_CACHE[kind] ?? null;
+}
+
+export function loadTrainerPortrait(kind: TrainerKind): Promise<HTMLImageElement> {
+  const cached = PORTRAIT_CACHE[kind];
+  if (cached) return Promise.resolve(cached);
+  const pending = PORTRAIT_PENDING[kind];
+  if (pending) return pending;
+  const svg = portraitSvgMarkup(kind);
+  const url = `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  const p = new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { PORTRAIT_CACHE[kind] = img; resolve(img); };
+    img.onerror = e => reject(e);
+    img.src = url;
+  });
+  PORTRAIT_PENDING[kind] = p;
+  return p;
+}
+
+export function preloadAllTrainerPortraits(): void {
+  (Object.keys(KIND_RENDERERS) as TrainerKind[]).forEach(k => { void loadTrainerPortrait(k); });
+}
 
 export function TrainerSprite({ kind, size = 160, facing = 'left', animate = true }: Props) {
   const [frame, setFrame] = useState<0 | 1>(0);
