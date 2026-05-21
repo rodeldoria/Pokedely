@@ -3,6 +3,8 @@ import type { Pokemon } from '../data/pokedex';
 import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, animatedSpriteUrl, hasAnimatedSprite, wildLevelFor } from '../data/pokedex';
 import { questionFor } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
+import { TrainerSprite } from './TrainerSprite';
+import type { NPCTrainer } from '../game/world';
 import {
   recordAnswer, recordCatch, useBall, useBerry, getLevel,
   ensureMemberHp, memberMaxHp, xpToNextLevel, grantXp,
@@ -16,6 +18,7 @@ interface Props {
   onExit: (caught: boolean, defeatedTrainer: boolean) => void;
   trainerName?: string;
   trainerReward?: string;
+  trainerKind?: NPCTrainer['kind'];
 }
 
 const TYPE_COLORS: Record<string, [string, string]> = {
@@ -145,7 +148,7 @@ function calcDamage(move: Move, defenderTypes: string[], level: number): number 
 
 type Phase = 'sendOut' | 'appear' | 'menu' | 'fightMenu' | 'swapMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
 
-export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward }: Props) {
+export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward, trainerKind }: Props) {
   const level = getLevel(state);
   const myMember: PartyMember | null = state.team[0] || null;
   if (myMember) ensureMemberHp(myMember, level);
@@ -496,6 +499,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           message={introMsg}
           addieLevel={level}
           wild={wild}
+          trainerName={trainerName}
+          trainerKind={trainerKind}
         />
       )}
       {/* ── Grass arena ──────────────────────────────────── */}
@@ -1016,8 +1021,9 @@ function RewardCallout({
   );
 }
 
-function SendOutIntro({ message, addieLevel, wild }: {
+function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
   message: string; addieLevel: number; wild: Pokemon;
+  trainerName?: string; trainerKind?: NPCTrainer['kind'];
 }) {
   return (
     <div style={{
@@ -1058,13 +1064,27 @@ function SendOutIntro({ message, addieLevel, wild }: {
           animation: 'popIn 0.4s ease-out 0.2s both',
         }}>VS</div>
         <div style={{ textAlign: 'center', animation: 'slideInRight 0.5s ease-out' }}>
-          <BattleSprite id={wild.id} alt={displayName(wild)} style={{
-            width: 180, height: 180,
-            filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.35)) drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
-          }} />
-          <div style={{ color: '#ffd54a', fontSize: 16, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
-            {displayName(wild)}
-          </div>
+          {trainerName && trainerKind ? (
+            <>
+              <TrainerSprite kind={trainerKind} size={180} facing="left" />
+              <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
+                {trainerName}
+              </div>
+              <div style={{ color: '#e0d4c0', fontSize: 12, marginTop: 2, letterSpacing: '1px' }}>
+                sent out {displayName(wild)}
+              </div>
+            </>
+          ) : (
+            <>
+              <BattleSprite id={wild.id} alt={displayName(wild)} style={{
+                width: 180, height: 180,
+                filter: 'drop-shadow(0 0 20px rgba(255,255,255,0.35)) drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
+              }} />
+              <div style={{ color: '#ffd54a', fontSize: 16, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
+                {displayName(wild)}
+              </div>
+            </>
+          )}
         </div>
       </div>
       <style>{`

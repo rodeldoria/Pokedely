@@ -243,6 +243,7 @@ export default function App() {
           onExit={handleBattleExit}
           trainerName={currentTrainer?.name}
           trainerReward={currentTrainer?.reward}
+          trainerKind={currentTrainer?.kind}
         />
       )}
 
