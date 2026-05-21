@@ -87,11 +87,3 @@ export function teacherFor(state: TrainerState, moveId: string): { id: number; n
   if (!member) return null;
   return { id: member.id, name: member.name };
 }
-
-// True when the player currently meets the unlock conditions for a move.
-// Used by the overworld to gate field actions (mining, scooping, etc.) so
-// the Moves modal and in-world prompts stay in sync.
-export function canUseMove(state: TrainerState, moveId: string): boolean {
-  const move = FIELD_MOVES.find(m => m.id === moveId);
-  return !!move && move.unlocked(state);
-}
