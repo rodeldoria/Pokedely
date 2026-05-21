@@ -153,6 +153,11 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   const [attacker, setAttacker] = useState<null | 'me' | 'wild'>(null);
   const [wildFainted, setWildFainted] = useState(false);
   const [myFainted, setMyFainted] = useState(false);
+  // Post-battle reward callout — populated by onWildFaint, rendered as an
+  // overlay during the 'result' phase so Addie can see the points she earned.
+  const [reward, setReward] = useState<{
+    xpGain: number; lvlBefore: number; lvlAfter: number; xpHave: number; xpNeed: number;
+  } | null>(null);
   const exited = useRef(false);
   // Bumped whenever the active lead changes (e.g., swap) so queued
   // enemy-turn timers can no-op rather than hit the wrong Pokémon.
@@ -185,10 +190,18 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   }, []);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleFlee(); };
+    const handler = (e: KeyboardEvent) => {
+      // Don't let Escape during the result/celebration window override a
+      // win — `safeExit` is first-call-wins, so flee would clobber the
+      // trainer-defeated flag and skip rewards.
+      if (e.key !== 'Escape') return;
+      if (phase === 'result' || wildFainted || caught || myFainted) return;
+      handleFlee();
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, wildFainted, caught, myFainted]);
 
   function safeExit(caughtFlag: boolean, defeatedTrainer = false) {
     if (exited.current) return;
@@ -258,19 +271,22 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     const lvlBefore = getLevel(state);
     const xpGain = trainerName ? 3 : 1 + Math.max(0, wild.rarity - 1);
     grantXp(state, xpGain);
-    const leveledUp = getLevel(state) > lvlBefore;
+    const lvlAfter = getLevel(state);
+    const leveledUp = lvlAfter > lvlBefore;
     onStateChange({ ...state });
-    const lvlMsg = leveledUp ? ` ⭐ LEVEL UP! Now Lv.${getLevel(state)}!` : ` (+${xpGain} XP)`;
+    const xpAfter = xpToNextLevel(state);
+    setReward({ xpGain, lvlBefore, lvlAfter, xpHave: xpAfter.have, xpNeed: xpAfter.need });
+    const lvlMsg = leveledUp ? ` ⭐ LEVEL UP! Now Lv.${lvlAfter}!` : ` (+${xpGain} XP)`;
     if (trainerName) {
       setFeedback(`🏆 You beat ${trainerName}!${lvlMsg}`);
       setLog(`Wild ${displayName(wild)} fainted!`);
       setPhase('result');
-      setTimeout(() => safeExit(false, true), 1800);
+      setTimeout(() => safeExit(false, true), 2600);
     } else {
       setFeedback(`${displayName(wild)} fainted!${lvlMsg}`);
       setLog('');
       setPhase('result');
-      setTimeout(() => safeExit(false, false), 1800);
+      setTimeout(() => safeExit(false, false), 2600);
     }
   }
 
@@ -534,9 +550,27 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
             filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
           }}>
           {myMember && (
-            <img src={backSpriteUrl(myMember.id)} alt={myMember.name} style={{
-              width: '100%', height: '100%', imageRendering: 'pixelated',
-            }} onError={(e) => { (e.currentTarget as HTMLImageElement).src = spriteUrl(myMember.id); }}/>
+            <img
+              src={homeSpriteUrl(myMember.id)}
+              alt={myMember.name}
+              style={{
+                width: '100%', height: '100%',
+                // Mirror so the polished HOME render faces the wild Pokémon
+                // up in the top-right instead of looking at the camera.
+                transform: 'scaleX(-1)',
+              }}
+              onError={(e) => {
+                const img = e.currentTarget as HTMLImageElement;
+                img.onerror = (() => {
+                  const img2 = img;
+                  img2.onerror = null;
+                  img2.src = spriteUrl(myMember.id);
+                  img2.style.imageRendering = 'pixelated';
+                }) as OnErrorEventHandler;
+                img.src = backSpriteUrl(myMember.id);
+                img.style.imageRendering = 'pixelated';
+              }}
+            />
           )}
           </div>
         </div>
@@ -559,15 +593,33 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           />
         )}
 
-        {/* Run button (top-right) */}
-        <button onClick={handleFlee} style={{
-          position: 'absolute', top: 20, right: 28,
-          background: '#d44a3a', color: '#fff',
-          border: '3px solid #1d1f24', borderRadius: 8,
-          padding: '8px 18px', fontWeight: 'bold', fontSize: 16,
-          fontFamily: 'inherit', letterSpacing: '1px',
-          cursor: 'pointer', boxShadow: '0 4px 0 #7a1f15',
-        }}>Run ×</button>
+        {/* Run button (top-right) — hidden once the battle has resolved so
+            a late click can't override a win via first-call-wins safeExit. */}
+        {phase !== 'result' && !wildFainted && !caught && !myFainted && (
+          <button onClick={handleFlee} style={{
+            position: 'absolute', top: 20, right: 28,
+            background: '#d44a3a', color: '#fff',
+            border: '3px solid #1d1f24', borderRadius: 8,
+            padding: '8px 18px', fontWeight: 'bold', fontSize: 16,
+            fontFamily: 'inherit', letterSpacing: '1px',
+            cursor: 'pointer', boxShadow: '0 4px 0 #7a1f15',
+          }}>Run ×</button>
+        )}
+
+        {/* ── Post-battle reward callout ──────────────────────
+            Shows a big visible "+X EXP" panel after a win so Addie can
+            celebrate the points she earned (the dialogue strip alone
+            buried this). Hides itself if the battle was a loss/flee. */}
+        {phase === 'result' && reward && !myFainted && !caught && (
+          <RewardCallout
+            xpGain={reward.xpGain}
+            leveledUp={reward.lvlAfter > reward.lvlBefore}
+            lvlAfter={reward.lvlAfter}
+            xpHave={reward.xpHave}
+            xpNeed={reward.xpNeed}
+            trainerName={trainerName}
+          />
+        )}
       </div>
 
       {/* ── Dialogue strip ──────────────────────────────── */}
@@ -772,6 +824,19 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           40%  { transform: translateY(-12px) rotate(15deg); opacity: 1; }
           100% { transform: translateY(80px) rotate(90deg); opacity: 0; filter: brightness(0.5) grayscale(0.7); }
         }
+        @keyframes rewardPop {
+          0%   { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+          55%  { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+          100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+        }
+        @keyframes xpFill {
+          from { transform: scaleX(var(--xp-from, 0)); }
+          to   { transform: scaleX(var(--xp-to, 1));   }
+        }
+        @keyframes sparkleSpin {
+          from { transform: rotate(0deg);  }
+          to   { transform: rotate(360deg);}
+        }
       `}</style>
       {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
       <span style={{ display: 'none' }}>{trainerReward}{bg}{text}</span>
@@ -866,6 +931,84 @@ function RetroHpCard({
           <div style={{ width: `${xpPct}%`, height: '100%', background: '#5b8aff', transition: 'width 0.4s' }} />
         </div>
       )}
+    </div>
+  );
+}
+
+function RewardCallout({
+  xpGain, leveledUp, lvlAfter, xpHave, xpNeed, trainerName,
+}: {
+  xpGain: number; leveledUp: boolean; lvlAfter: number;
+  xpHave: number; xpNeed: number; trainerName?: string;
+}) {
+  const xpPct = Math.max(0, Math.min(100, (xpHave / Math.max(1, xpNeed)) * 100));
+  const title = leveledUp
+    ? `LEVEL UP!  Lv. ${lvlAfter}`
+    : trainerName
+      ? `Victory!`
+      : `You won!`;
+  const titleColor = leveledUp ? '#ffe066' : '#ffd54a';
+  const ringColor = leveledUp ? '#ffd54a' : '#7dd87d';
+  return (
+    <div style={{
+      position: 'absolute', left: '50%', top: '50%',
+      transform: 'translate(-50%, -50%)',
+      background: 'linear-gradient(160deg, rgba(20,12,4,0.96) 0%, rgba(10,6,2,0.96) 100%)',
+      border: `4px solid ${ringColor}`,
+      borderRadius: 20,
+      padding: '20px 36px 22px',
+      minWidth: 320,
+      textAlign: 'center',
+      boxShadow: `0 0 60px ${leveledUp ? 'rgba(255,213,74,0.55)' : 'rgba(125,216,125,0.45)'}, 0 8px 0 rgba(0,0,0,0.4)`,
+      animation: 'rewardPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+      pointerEvents: 'none',
+      zIndex: 5,
+    }}>
+      {leveledUp && (
+        <div style={{
+          position: 'absolute', inset: -18,
+          background: 'radial-gradient(circle, rgba(255,213,74,0.18) 0%, transparent 65%)',
+          borderRadius: '50%', pointerEvents: 'none',
+          animation: 'sparkleSpin 8s linear infinite',
+        }} />
+      )}
+      <div style={{
+        color: titleColor, fontWeight: 'bold', fontSize: 22,
+        letterSpacing: '2px', textShadow: '0 2px 0 rgba(0,0,0,0.5)',
+      }}>
+        {leveledUp ? '⭐ ' : '🏆 '}{title}{leveledUp ? ' ⭐' : ''}
+      </div>
+      <div style={{
+        marginTop: 12,
+        color: '#fff7d6', fontWeight: 'bold', fontSize: 40,
+        letterSpacing: '1px', lineHeight: 1,
+        textShadow: '0 3px 0 rgba(0,0,0,0.5)',
+      }}>
+        +{xpGain} <span style={{ fontSize: 22, color: '#9d7a3a' }}>EXP</span>
+      </div>
+      <div style={{ marginTop: 14 }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between',
+          color: '#bfc3cc', fontSize: 11, fontWeight: 'bold',
+          letterSpacing: '1px', marginBottom: 4,
+        }}>
+          <span>EXP</span>
+          <span>{xpHave} / {xpNeed}</span>
+        </div>
+        <div style={{
+          background: '#0e0f12', borderRadius: 6, height: 12,
+          border: '2px solid #3a3d44', overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${xpPct}%`, height: '100%',
+            background: leveledUp
+              ? 'linear-gradient(90deg, #ffd54a, #ffe066, #ffd54a)'
+              : 'linear-gradient(90deg, #5b8aff, #7dafff)',
+            transition: 'width 0.8s ease-out',
+            boxShadow: leveledUp ? '0 0 10px rgba(255,213,74,0.7)' : 'none',
+          }} />
+        </div>
+      </div>
     </div>
   );
 }
