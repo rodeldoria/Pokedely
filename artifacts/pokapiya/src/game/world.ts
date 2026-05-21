@@ -216,10 +216,13 @@ function generateTown(): WorldMap {
     { x: midX + 2, y: height-5, text: '↓ MEADOW' },
   ];
   const trainers: NPCTrainer[] = [
-    { id: 'hiker_joe',  name: 'Hiker Joe',  kind: 'hiker',  tx: width - 8, ty: 4,  pokemonId: 74,  greet: "Yo! Battle me, lil' trainer!", reward: 'cut' },
-    { id: 'fisher_mac', name: 'Fisher Mac', kind: 'fisher', tx: 8,         ty: 30, pokemonId: 60,  greet: "Reel one in! Wanna battle?", reward: 'rod' },
-    { id: 'camper_sue', name: 'Camper Sue', kind: 'camper', tx: 38,        ty: 22, pokemonId: 25,  greet: "My Pikachu is super strong!", reward: 'pokeballs' },
-    { id: 'lass_lily',  name: 'Lass Lily',  kind: 'lass',   tx: 20,        ty: 14, pokemonId: 35,  greet: "Hi! Let's have a fairy battle!", reward: 'berries' },
+    { id: 'hiker_joe',     name: 'Hiker Joe',     kind: 'hiker',  tx: width - 8, ty: 4,         pokemonId: 74,  greet: "Yo! Battle me, lil' trainer!",        reward: 'cut' },
+    { id: 'fisher_mac',    name: 'Fisher Mac',    kind: 'fisher', tx: 8,         ty: 30,        pokemonId: 60,  greet: "Reel one in! Wanna battle?",         reward: 'rod' },
+    { id: 'camper_sue',    name: 'Camper Sue',    kind: 'camper', tx: 38,        ty: 22,        pokemonId: 25,  greet: "My Pikachu is super strong!",        reward: 'pokeballs' },
+    { id: 'lass_lily',     name: 'Lass Lily',     kind: 'lass',   tx: 20,        ty: 14,        pokemonId: 35,  greet: "Hi! Let's have a fairy battle!",     reward: 'berries' },
+    { id: 'bug_kid_ben',   name: 'Bug Kid Ben',   kind: 'bug',    tx: 12,        ty: 22,        pokemonId: 12,  greet: "My Butterfree loves a fight!",       reward: 'pokeballs' },
+    { id: 'lass_mimi',     name: 'Lass Mimi',     kind: 'lass',   tx: width - 12,ty: 28,        pokemonId: 39,  greet: "Jigglypuff sings sweet songs!",      reward: 'berries' },
+    { id: 'gym_brock',     name: 'Gym Leader Brock', kind: 'hiker', tx: midX - 4, ty: midY + 4, pokemonId: 95,  greet: "I'm the Rock Gym Leader! Ready?",    reward: 'pokeballs' },
   ];
 
   return {
@@ -296,7 +299,12 @@ function generateMeadow(): WorldMap {
         { x: midX + 2, y: 3,  text: '↑ TOWN' },
         { x: midX - 4, y: 12, text: 'MEADOW' },
       ],
-      trainers: [],
+      trainers: [
+        { id: 'bug_kid_kai',  name: 'Bug Kid Kai',  kind: 'bug',    tx: 10, ty: 10, pokemonId: 13,  greet: "Weedle is ready!",                reward: 'pokeballs' },
+        { id: 'lass_poppy',   name: 'Lass Poppy',   kind: 'lass',   tx: 32, ty: 14, pokemonId: 43,  greet: "Oddish loves the meadow!",        reward: 'berries' },
+        { id: 'camper_finn',  name: 'Camper Finn',  kind: 'camper', tx: 22, ty: 26, pokemonId: 46,  greet: "Paras crawls for victory!",       reward: 'pokeballs' },
+        { id: 'gym_erika',    name: 'Gym Leader Erika', kind: 'lass', tx: 18, ty: 6,  pokemonId: 71, greet: "I'm the Grass Gym Leader! En garde!", reward: 'pokeballs' },
+      ],
       entries: { n: { x: midX, y: 2 } },
     },
     exits: { n: 'town' },
@@ -359,7 +367,12 @@ function generateMountain(): WorldMap {
         { x: midX + 2, y: 3,          text: '↑ CAVE' },
         { x: 8,        y: 14,         text: 'TRAIL' },
       ],
-      trainers: [],
+      trainers: [
+        { id: 'hiker_dan',    name: 'Hiker Dan',    kind: 'hiker',  tx: 8,  ty: 8,  pokemonId: 95,  greet: "Onix is rock-solid!",            reward: 'pokeballs' },
+        { id: 'hiker_rosa',   name: 'Hiker Rosa',   kind: 'hiker',  tx: 34, ty: 20, pokemonId: 27,  greet: "Sandshrew never gives up!",      reward: 'pokeballs' },
+        { id: 'camper_milo',  name: 'Camper Milo',  kind: 'camper', tx: 18, ty: 28, pokemonId: 21,  greet: "Spearow swoops in!",             reward: 'berries' },
+        { id: 'gym_lt_surge', name: 'Gym Leader Surge', kind: 'hiker', tx: 26, ty: 12, pokemonId: 26, greet: "Zappy zappy! Electric Gym!",   reward: 'pokeballs' },
+      ],
       entries: {
         s: { x: midX, y: height - 3 },
         n: { x: midX, y: 2 },
@@ -434,7 +447,11 @@ function generateCave(): WorldMap {
         { x: midX + 2, y: height - 4, text: '↓ TRAIL' },
         { x: 8,        y: 10,         text: 'CAVE' },
       ],
-      trainers: [],
+      trainers: [
+        { id: 'bug_kid_mei',  name: 'Bug Kid Mei',  kind: 'bug',    tx: 12, ty: 6,  pokemonId: 41,  greet: "Zubat zoom!",                    reward: 'pokeballs' },
+        { id: 'hiker_otto',   name: 'Hiker Otto',   kind: 'hiker',  tx: 26, ty: 20, pokemonId: 109, greet: "Koffing's gas attack incoming!", reward: 'pokeballs' },
+        { id: 'gym_sabrina',  name: 'Gym Leader Sabrina', kind: 'lass', tx: 18, ty: 12, pokemonId: 92, greet: "I sense your power! Psychic Gym!", reward: 'pokeballs' },
+      ],
       entries: { s: { x: midX, y: height - 3 } },
     },
     exits: { s: 'mountain' },

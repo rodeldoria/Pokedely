@@ -80,7 +80,7 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
         <button onClick={onQuests} style={btnStyle('#b85cff')}>📜 Quests (Q)</button>
         <button onClick={onPokedex} style={btnStyle('#5a73c4')}>📕 Pokédex (P)</button>
         <button onClick={onTeam} style={btnStyle('#d63946')}>👥 Team (T)</button>
-        <button onClick={onBox} style={btnStyle('#8a5cff')}>📦 Box (B)</button>
+        <button onClick={onBox} style={btnStyle('#8a5cff')}>📦 Box</button>
         <button onClick={onSave} style={btnStyle('#2d8a52')}>💾 Save</button>
       </div>
 
@@ -91,10 +91,11 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
         border: '1px solid #5a3e1e', lineHeight: 1.5,
       }}>
         <div><b>WASD/Arrows</b> — Move</div>
-        <div><b>F</b> — Cut tree / Fish at water</div>
+        <div><b>F</b> — Cut tree / Fish / Place</div>
         <div><b>Space</b> near a trainer — Battle</div>
+        <div><b>B</b> Build mode · <b>1–9, 0</b> Pick item · <b>F</b> Place</div>
         <div><b>T</b> Team · <b>P</b> Pokédex · <b>Q</b> Quests</div>
-        <div><b>M</b> Moves · <b>C</b> Craft · <b>B</b> Box</div>
+        <div><b>M</b> Moves · <b>C</b> Craft</div>
       </div>
 
       {state.team.length > 0 && (

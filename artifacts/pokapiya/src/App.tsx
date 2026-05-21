@@ -150,7 +150,8 @@ export default function App() {
         if (k === 'q') setScreen('quests');
         if (k === 'm') setScreen('moves');
         if (k === 'c') setScreen('craft');
-        if (k === 'b') { pcReturnRef.current = 'world'; setScreen('pc'); }
+        // B is reserved for build mode in GameCanvas — Box is button-only
+        // now to avoid the conflict that was hiding the build HUD.
       } else if (k === 'escape') {
         if (screen === 'team' || screen === 'pokedex' ||
             screen === 'quests' || screen === 'moves' || screen === 'craft') setScreen('world');
