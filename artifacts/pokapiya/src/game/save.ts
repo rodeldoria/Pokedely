@@ -38,7 +38,17 @@ export interface TrainerState {
   box: PartyMember[];
   pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
   stats: { correct: number; wrong: number; caught: number; encounters: number };
-  inventory: { pokeball: number; berry: number; cut: number; rod: number; coin: number; lumber: number; stone: number; seed: number; water: number; metal: number };
+  inventory: {
+    pokeball: number; berry: number; cut: number; rod: number; coin: number;
+    lumber: number; stone: number; seed: number; water: number; metal: number;
+    // Placeables — count of each structure Addie has crafted but not yet
+    // placed. When she enters build mode (B in the overworld) she spends
+    // one of these to drop the structure on a free grass tile.
+    fence: number; berry_tree: number; path_tile: number; house: number;
+  };
+  // Tile-scoped map of structures Addie has placed in the world.
+  // Key format: `${zoneId}:${x},${y}`. Value is the structure kind.
+  placedStructures: Record<string, StructureKind>;
   // Tile-scoped maps. Keys are namespaced as `${zoneId}:${x},${y}` so the
   // same coordinates in different zones don't collide.
   worldItems: Record<string, boolean>;
@@ -61,13 +71,23 @@ const LEGACY_KEY_V3 = 'pokapiya.save.v3';
 // a play session, but long enough that the world doesn't feel infinitely farmable.
 export const RESOURCE_RESPAWN_MS = 3 * 60 * 1000;
 
+// Kinds of structures Addie can craft at the workshop and place in the world.
+// Order matches the build-mode picker (1/2/3/4) in GameCanvas.
+export type StructureKind = 'fence' | 'berry_tree' | 'path_tile' | 'house';
+export const STRUCTURE_KINDS: StructureKind[] = ['fence', 'berry_tree', 'path_tile', 'house'];
+
 const empty = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
   team: [],
   box: [],
   pokedex: {},
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
-  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0, lumber: 0, stone: 0, seed: 0, water: 0, metal: 0 },
+  inventory: {
+    pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0,
+    lumber: 0, stone: 0, seed: 0, water: 0, metal: 0,
+    fence: 0, berry_tree: 0, path_tile: 0, house: 0,
+  },
+  placedStructures: {},
   worldItems: {},
   cutTrees: {},
   minedRocks: {},
@@ -158,6 +178,7 @@ export function load(): TrainerState {
       cutTrees: migrateTimestampKeys(parsed.cutTrees),
       minedRocks: migrateTimestampKeys(parsed.minedRocks),
       defeatedTrainers: parsed.defeatedTrainers || {},
+      placedStructures: parsed.placedStructures || {},
       currentZone: ZONE_IDS.includes(parsed.currentZone) ? (parsed.currentZone as ZoneId) : 'town',
     };
 
@@ -325,26 +346,86 @@ export function spendCoins(state: TrainerState, n: number): boolean {
   return true;
 }
 
+// ── Build-mode placement ────────────────────────────────────────────────
+// Addie places structures on free grass/path tiles via build mode in the
+// overworld. Each placement consumes one of the matching placeable items.
+
+export function structureCountFor(state: TrainerState, kind: StructureKind): number {
+  return state.inventory[kind] || 0;
+}
+
+export function totalPlaceables(state: TrainerState): number {
+  const inv = state.inventory;
+  return inv.fence + inv.berry_tree + inv.path_tile + inv.house;
+}
+
+export function getStructureAt(state: TrainerState, zoneId: string, x: number, y: number): StructureKind | null {
+  return state.placedStructures[`${zoneId}:${x},${y}`] || null;
+}
+
+// Place a structure of `kind` at (x,y) in the given zone, spending one from
+// inventory. Returns true on success. Caller is responsible for verifying
+// the tile is actually placeable (free grass/path, not on player/door/etc).
+export function placeStructure(
+  state: TrainerState,
+  zoneId: string,
+  x: number, y: number,
+  kind: StructureKind,
+): boolean {
+  if (structureCountFor(state, kind) <= 0) return false;
+  const key = `${zoneId}:${x},${y}`;
+  if (state.placedStructures[key]) return false; // tile already used
+  state.placedStructures[key] = kind;
+  state.inventory[kind] -= 1;
+  save(state);
+  return true;
+}
+
+// Remove a placed structure (refunds nothing — Addie can re-pickup is a
+// future enhancement). Currently unused by the UI but exposed for tests
+// and future "undo" support.
+export function removeStructure(state: TrainerState, zoneId: string, x: number, y: number): boolean {
+  const key = `${zoneId}:${x},${y}`;
+  if (!state.placedStructures[key]) return false;
+  delete state.placedStructures[key];
+  save(state);
+  return true;
+}
+
+// A placed berry_tree is "solid" for collision; path_tile is walkable;
+// fence and house are solid.
+export function isPlacedSolid(kind: StructureKind): boolean {
+  return kind !== 'path_tile';
+}
+
 export function craft(state: TrainerState, recipeId: string): boolean {
   const inv = state.inventory;
   switch (recipeId) {
     case 'fence':
       if (inv.lumber < 2) return false;
       inv.lumber -= 2;
-      inv.coin += 3;
+      inv.fence += 1;
       save(state);
       return true;
     case 'path':
       if (inv.stone < 2) return false;
       inv.stone -= 2;
-      inv.coin += 3;
+      inv.path_tile += 1;
       save(state);
       return true;
     case 'berry-tree':
       if (inv.seed < 1 || inv.lumber < 1) return false;
       inv.seed -= 1;
       inv.lumber -= 1;
-      inv.berry += 2;
+      inv.berry_tree += 1;
+      save(state);
+      return true;
+    case 'house':
+      if (inv.lumber < 8 || inv.stone < 4 || inv.metal < 1) return false;
+      inv.lumber -= 8;
+      inv.stone -= 4;
+      inv.metal -= 1;
+      inv.house += 1;
       save(state);
       return true;
     case 'sell-berry':
