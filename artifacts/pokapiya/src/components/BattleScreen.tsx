@@ -1021,6 +1021,16 @@ function RewardCallout({
   );
 }
 
+// One-line pre-battle taunt per trainer class. Shown in a speech bubble next
+// to the trainer portrait on the VS intro so each class feels distinct.
+const TRAINER_TAUNTS: Record<NPCTrainer['kind'], string> = {
+  hiker:  "Off the trail, kiddo!",
+  fisher: "Caught one — now I'll catch you!",
+  camper: "S'more battles, please!",
+  bug:    "My bugs bite back!",
+  lass:   "Don't cry when you lose!",
+};
+
 function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
   message: string; addieLevel: number; wild: Pokemon;
   trainerName?: string; trainerKind?: NPCTrainer['kind'];
@@ -1066,7 +1076,47 @@ function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
         <div style={{ textAlign: 'center', animation: 'slideInRight 0.5s ease-out' }}>
           {trainerName && trainerKind ? (
             <>
-              <TrainerSprite kind={trainerKind} size={180} facing="left" />
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <div style={{
+                  position: 'absolute',
+                  right: 'calc(100% + 12px)',
+                  top: 18,
+                  maxWidth: 200,
+                  background: '#fff',
+                  color: '#2a1428',
+                  border: '2px solid #1a0d00',
+                  borderRadius: 12,
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  fontWeight: 'bold',
+                  lineHeight: 1.25,
+                  textAlign: 'left',
+                  boxShadow: '0 4px 0 rgba(0,0,0,0.25)',
+                  whiteSpace: 'normal',
+                  animation: 'tauntPop 0.35s ease-out 0.35s both',
+                }}>
+                  “{TRAINER_TAUNTS[trainerKind]}”
+                  <span style={{
+                    position: 'absolute',
+                    right: -10,
+                    top: 16,
+                    width: 0, height: 0,
+                    borderTop: '8px solid transparent',
+                    borderBottom: '8px solid transparent',
+                    borderLeft: '10px solid #1a0d00',
+                  }} />
+                  <span style={{
+                    position: 'absolute',
+                    right: -7,
+                    top: 18,
+                    width: 0, height: 0,
+                    borderTop: '6px solid transparent',
+                    borderBottom: '6px solid transparent',
+                    borderLeft: '8px solid #fff',
+                  }} />
+                </div>
+                <TrainerSprite kind={trainerKind} size={180} facing="left" />
+              </div>
               <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
                 {trainerName}
               </div>
@@ -1091,6 +1141,7 @@ function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
         @keyframes slideInLeft { from { transform: translateX(-60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes slideInRight { from { transform: translateX(60px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes tauntPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
       `}</style>
     </div>
   );
