@@ -38,7 +38,8 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- **Resource respawn timing.** Trees and rocks regrow `RESOURCE_RESPAWN_MS` (3 min) after harvest. `cutTrees` and `minedRocks` store epoch-ms timestamps, not booleans — never test them with truthiness, always go through `isTreeStanding` / `isRockIntact` in `artifacts/pokapiya/src/game/save.ts`. Legacy boolean entries are migrated on load.
+- **F-press order in `GameCanvas.tsx` must match F-prompt order.** Both check tree → rock → water. If you add a new interactable, update both blocks together or the prompt will lie.
 
 ## Pointers
 
