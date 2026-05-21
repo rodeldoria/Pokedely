@@ -3188,6 +3188,40 @@
         "answerIndex": 0,
         "hint": "Say your real address so grown-ups can take you home."
       }
+    ],
+    "spell_picture": [
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐱", "answer": "CAT",   "prompt": "Type the name of this picture:", "choices": ["CAT"],   "answerIndex": 0, "hint": "Starts with C." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐶", "answer": "DOG",   "prompt": "Type the name of this picture:", "choices": ["DOG"],   "answerIndex": 0, "hint": "Starts with D." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐟", "answer": "FISH",  "prompt": "Type the name of this picture:", "choices": ["FISH"],  "answerIndex": 0, "hint": "Starts with F." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐝", "answer": "BEE",   "prompt": "Type the name of this picture:", "choices": ["BEE"],   "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐸", "answer": "FROG",  "prompt": "Type the name of this picture:", "choices": ["FROG"],  "answerIndex": 0, "hint": "Starts with F." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐮", "answer": "COW",   "prompt": "Type the name of this picture:", "choices": ["COW"],   "answerIndex": 0, "hint": "Starts with C." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐷", "answer": "PIG",   "prompt": "Type the name of this picture:", "choices": ["PIG"],   "answerIndex": 0, "hint": "Starts with P." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐰", "answer": "BUNNY", "prompt": "Type the name of this picture:", "choices": ["BUNNY"], "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐻", "answer": "BEAR",  "prompt": "Type the name of this picture:", "choices": ["BEAR"],  "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🦁", "answer": "LION",  "prompt": "Type the name of this picture:", "choices": ["LION"],  "answerIndex": 0, "hint": "Starts with L." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐦", "answer": "BIRD",  "prompt": "Type the name of this picture:", "choices": ["BIRD"],  "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🐭", "answer": "MOUSE", "prompt": "Type the name of this picture:", "choices": ["MOUSE"], "answerIndex": 0, "hint": "Starts with M." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🦋", "answer": "BUTTERFLY", "prompt": "Type the name of this picture:", "choices": ["BUTTERFLY"], "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🌞", "answer": "SUN",   "prompt": "Type the name of this picture:", "choices": ["SUN"],   "answerIndex": 0, "hint": "Starts with S." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🌙", "answer": "MOON",  "prompt": "Type the name of this picture:", "choices": ["MOON"],  "answerIndex": 0, "hint": "Starts with M." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "⭐", "answer": "STAR",  "prompt": "Type the name of this picture:", "choices": ["STAR"],  "answerIndex": 0, "hint": "Starts with S." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🌳", "answer": "TREE",  "prompt": "Type the name of this picture:", "choices": ["TREE"],  "answerIndex": 0, "hint": "Starts with T." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🌸", "answer": "FLOWER","prompt": "Type the name of this picture:", "choices": ["FLOWER"],"answerIndex": 0, "hint": "Starts with F." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🍎", "answer": "APPLE", "prompt": "Type the name of this picture:", "choices": ["APPLE"], "answerIndex": 0, "hint": "Starts with A." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🍌", "answer": "BANANA","prompt": "Type the name of this picture:", "choices": ["BANANA"],"answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🍓", "answer": "BERRY", "prompt": "Type the name of this picture:", "choices": ["BERRY"], "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🍕", "answer": "PIZZA", "prompt": "Type the name of this picture:", "choices": ["PIZZA"], "answerIndex": 0, "hint": "Starts with P." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🍪", "answer": "COOKIE","prompt": "Type the name of this picture:", "choices": ["COOKIE"],"answerIndex": 0, "hint": "Starts with C." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🎂", "answer": "CAKE",  "prompt": "Type the name of this picture:", "choices": ["CAKE"],  "answerIndex": 0, "hint": "Starts with C." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🚗", "answer": "CAR",   "prompt": "Type the name of this picture:", "choices": ["CAR"],   "answerIndex": 0, "hint": "Starts with C." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🚂", "answer": "TRAIN", "prompt": "Type the name of this picture:", "choices": ["TRAIN"], "answerIndex": 0, "hint": "Starts with T." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🚌", "answer": "BUS",   "prompt": "Type the name of this picture:", "choices": ["BUS"],   "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🏠", "answer": "HOUSE", "prompt": "Type the name of this picture:", "choices": ["HOUSE"], "answerIndex": 0, "hint": "Starts with H." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "👒", "answer": "HAT",   "prompt": "Type the name of this picture:", "choices": ["HAT"],   "answerIndex": 0, "hint": "Starts with H." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "📖", "answer": "BOOK",  "prompt": "Type the name of this picture:", "choices": ["BOOK"],  "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "⚽", "answer": "BALL",  "prompt": "Type the name of this picture:", "choices": ["BALL"],  "answerIndex": 0, "hint": "Starts with B." },
+      { "subject": "Spell the Picture", "kind": "spell", "image": "🥚", "answer": "EGG",   "prompt": "Type the name of this picture:", "choices": ["EGG"],   "answerIndex": 0, "hint": "Starts with E." }
     ]
   }
 }

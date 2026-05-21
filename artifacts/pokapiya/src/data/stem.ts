@@ -1,12 +1,20 @@
 import bank from './questions-generated.json';
 import type { Pokemon } from './pokedex';
 
-interface Question {
+export interface Question {
   prompt: string;
   choices: string[];
   answerIndex: number;
   subject: string;
   hint?: string;
+  // 'choice' (default) shows multiple-choice buttons. 'spell' shows a picture
+  // (emoji) and Addie types the answer. For 'spell', `answer` is the
+  // expected word (case-insensitive); `image` is the emoji to display.
+  // `choices` should be a single-element array `[answer]` so existing
+  // feedback like "the answer was …" still works.
+  kind?: 'choice' | 'spell';
+  image?: string;
+  answer?: string;
 }
 
 interface Bank {
@@ -18,6 +26,9 @@ const typedBank = bank as Bank;
 const pickOne = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
 function shuffleChoices(q: Question): Question {
+  // Don't shuffle "spell the picture" questions — they only have one answer
+  // and we'd lose nothing, but it also keeps the JSON authoring trivial.
+  if (q.kind === 'spell') return q;
   const indexed = q.choices.map((c, i) => ({ c, i }));
   for (let i = indexed.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -30,7 +41,7 @@ function shuffleChoices(q: Question): Question {
 // Categories sorted by approximate difficulty. Slice 5 added second-grade
 // material — multiplication, planets, bugs, computer_science, and
 // reading-with-stories — so MEDIUM and HARD got pulled in to match.
-const EASY = ['colors', 'shapes', 'counting', 'animals', 'opposites', 'addie', 'family'];
+const EASY = ['colors', 'shapes', 'counting', 'animals', 'opposites', 'addie', 'family', 'spell_picture'];
 const MEDIUM = [
   'spelling', 'alphabet', 'rhymes', 'patterns', 'categorize', 'science',
   'bugs', 'planets'
@@ -45,23 +56,23 @@ const HARD = [
 // do when lost) come up regularly no matter what wild Pokémon Addie
 // is battling. These are real-world safety facts she needs to know.
 const TYPE_TO_CATEGORY: Record<string, string[]> = {
-  grass:   ['animals','science','spelling','addie','bugs','family'],
-  bug:     ['animals','spelling','counting','bugs','science','family'],
-  water:   ['animals','science','categorize','reading_stories','family'],
-  fire:    ['colors','science','opposites','planets','family'],
+  grass:   ['animals','science','spelling','addie','bugs','family','spell_picture'],
+  bug:     ['animals','spelling','counting','bugs','science','family','spell_picture'],
+  water:   ['animals','science','categorize','reading_stories','family','spell_picture'],
+  fire:    ['colors','science','opposites','planets','family','spell_picture'],
   electric:['science','patterns','math','addie','computer_science','multiplication','family'],
-  ice:     ['science','opposites','colors','planets','family'],
+  ice:     ['science','opposites','colors','planets','family','spell_picture'],
   steel:   ['shapes','patterns','math','computer_science','multiplication','family'],
   rock:    ['shapes','science','categorize','planets','family'],
-  ground:  ['science','shapes','counting','bugs','family'],
-  flying:  ['animals','patterns','reading','reading_stories','family'],
+  ground:  ['science','shapes','counting','bugs','family','spell_picture'],
+  flying:  ['animals','patterns','reading','reading_stories','family','spell_picture'],
   fighting:['math','subtraction','opposites','multiplication','family'],
-  poison:  ['categorize','opposites','colors','bugs','family'],
+  poison:  ['categorize','opposites','colors','bugs','family','spell_picture'],
   psychic: ['patterns','alphabet','reading','computer_science','reading_stories','family'],
   ghost:   ['rhymes','alphabet','patterns','computer_science','family'],
   dragon:  ['math','subtraction','reading','multiplication','reading_stories','family'],
-  fairy:   ['rhymes','spelling','colors','addie','family'],
-  normal:  ['spelling','counting','animals','addie','reading_stories','family'],
+  fairy:   ['rhymes','spelling','colors','addie','family','spell_picture'],
+  normal:  ['spelling','counting','animals','addie','reading_stories','family','spell_picture'],
   dark:    ['opposites','rhymes','alphabet','computer_science','family'],
 };
 

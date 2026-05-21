@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import type { Pokemon } from '../data/pokedex';
 import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, animatedSpriteUrl, hasAnimatedSprite, wildLevelFor } from '../data/pokedex';
-import { questionFor } from '../data/stem';
+import { questionFor, type Question } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import { TrainerSprite } from './TrainerSprite';
 import type { NPCTrainer } from '../game/world';
@@ -338,6 +338,18 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
   function handleAnswer(idx: number) {
     if (phase !== 'question') return;
     const correct = idx === question.answerIndex;
+    resolveAnswer(correct);
+  }
+
+  // Spell-the-picture: Addie types the word. Case- and whitespace-insensitive.
+  function handleSpellSubmit(typed: string) {
+    if (phase !== 'question') return;
+    const expected = (question.answer || question.choices[question.answerIndex] || '').trim().toUpperCase();
+    const got = typed.trim().toUpperCase();
+    resolveAnswer(got === expected);
+  }
+
+  function resolveAnswer(correct: boolean) {
     recordAnswer(state, correct);
     onStateChange({ ...state });
 
@@ -348,7 +360,8 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
     } else {
       const newAttempts = attemptsLeft - 1;
       setAttemptsLeft(newAttempts);
-      setFeedback(`So close! The answer was "${question.choices[question.answerIndex]}". ${question.hint || ''}`);
+      const ans = question.answer || question.choices[question.answerIndex];
+      setFeedback(`So close! The answer was "${ans}". ${question.hint || ''}`);
       if (newAttempts <= 0) {
         setTimeout(() => handleFlee(), 1500);
       } else {
@@ -771,26 +784,35 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
             <div style={{ textAlign: 'center', marginBottom: 8, color: '#f0c050', fontSize: 13, fontWeight: 'bold', letterSpacing: '1px' }}>
               {question.subject.toUpperCase()} · LV {level} QUESTION · TRIES {attemptsLeft}
             </div>
-            <div style={{
-              textAlign: 'center', color: '#f1ebd6', fontSize: 18, fontWeight: 'bold',
-              marginBottom: 14, lineHeight: 1.4,
-            }}>{question.prompt}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 800, margin: '0 auto' }}>
-              {question.choices.map((choice, i) => (
-                <button key={i} onClick={() => handleAnswer(i)} style={{
-                  background: '#2a2d33',
-                  border: `2px solid ${CHOICE_BORDERS[i % 4]}`,
-                  borderRadius: 10, padding: '14px 18px',
-                  fontFamily: 'inherit', fontWeight: 'bold', fontSize: 16,
-                  color: '#f1ebd6', cursor: 'pointer', transition: 'filter 0.1s',
-                  letterSpacing: '0.5px',
-                }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#3a3d44')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#2a2d33')}>
-                  {String.fromCharCode(65 + i)}. {choice}
-                </button>
-              ))}
-            </div>
+            {question.kind === 'spell' ? (
+              <SpellPicturePanel
+                question={question}
+                onSubmit={(typed) => handleSpellSubmit(typed)}
+              />
+            ) : (
+              <>
+                <div style={{
+                  textAlign: 'center', color: '#f1ebd6', fontSize: 18, fontWeight: 'bold',
+                  marginBottom: 14, lineHeight: 1.4,
+                }}>{question.prompt}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 800, margin: '0 auto' }}>
+                  {question.choices.map((choice, i) => (
+                    <button key={i} onClick={() => handleAnswer(i)} style={{
+                      background: '#2a2d33',
+                      border: `2px solid ${CHOICE_BORDERS[i % 4]}`,
+                      borderRadius: 10, padding: '14px 18px',
+                      fontFamily: 'inherit', fontWeight: 'bold', fontSize: 16,
+                      color: '#f1ebd6', cursor: 'pointer', transition: 'filter 0.1s',
+                      letterSpacing: '0.5px',
+                    }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#3a3d44')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#2a2d33')}>
+                      {String.fromCharCode(65 + i)}. {choice}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             <div style={{ textAlign: 'center', marginTop: 10 }}>
               <button onClick={() => { setPhase('menu'); setLog('What will you do?'); }} style={backBtnStyle}>← Back to menu</button>
             </div>
@@ -853,6 +875,103 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
 }
 
 const CHOICE_BORDERS = ['#5ba36f', '#5b8aa3', '#a37a4a', '#8a5ba3'];
+
+// Spell-the-picture panel: shows an emoji "picture" and a typing input with
+// one box per letter of the answer. Addie can type freely or click letters;
+// Enter (or the Check button) submits.
+function SpellPicturePanel({ question, onSubmit }: { question: Question; onSubmit: (typed: string) => void }) {
+  const expected = (question.answer || question.choices[question.answerIndex] || '').toUpperCase();
+  const letters = expected.length;
+  const [typed, setTyped] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Re-focus and clear input each time the question changes (e.g. after a wrong answer).
+  useEffect(() => {
+    setTyped('');
+    const id = window.setTimeout(() => inputRef.current?.focus(), 60);
+    return () => window.clearTimeout(id);
+  }, [question]);
+
+  const submit = () => {
+    if (typed.trim().length === 0) return;
+    onSubmit(typed);
+  };
+
+  // Visual letter boxes that mirror what's in the input.
+  const boxes = Array.from({ length: letters }, (_, i) => typed[i]?.toUpperCase() || '');
+
+  return (
+    <div style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center' }}>
+      <div style={{ color: '#f1ebd6', fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+        {question.prompt}
+      </div>
+      {/* Big emoji "picture" */}
+      <div style={{
+        fontSize: 140, lineHeight: 1,
+        margin: '6px 0 10px',
+        filter: 'drop-shadow(0 6px 4px rgba(0,0,0,0.35))',
+      }}>{question.image || '❓'}</div>
+
+      {/* Hint = number of letters */}
+      <div style={{ color: '#90c4d8', fontSize: 13, fontWeight: 'bold', letterSpacing: '1px', marginBottom: 10 }}>
+        {letters} {letters === 1 ? 'LETTER' : 'LETTERS'}
+      </div>
+
+      {/* Visual letter boxes */}
+      <div
+        style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 14, cursor: 'text' }}
+        onClick={() => inputRef.current?.focus()}
+      >
+        {boxes.map((ch, i) => (
+          <div key={i} style={{
+            width: 42, height: 52,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: ch ? '#2a3a2a' : '#22272e',
+            border: `2px solid ${ch ? '#7dd87d' : '#5b8aa3'}`,
+            borderRadius: 8,
+            color: '#f1ebd6', fontSize: 26, fontWeight: 'bold',
+            fontFamily: '"Courier New", monospace',
+          }}>{ch}</div>
+        ))}
+      </div>
+
+      {/* Hidden-ish text input drives the boxes. Kept visible so on-screen
+          keyboards (mobile) still work; styled small + centered. */}
+      <input
+        ref={inputRef}
+        type="text"
+        autoFocus
+        value={typed}
+        maxLength={letters}
+        onChange={(e) => {
+          // Letters only, uppercase as she types.
+          const cleaned = e.target.value.replace(/[^a-zA-Z]/g, '').slice(0, letters);
+          setTyped(cleaned);
+        }}
+        onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+        placeholder="type your answer"
+        style={{
+          width: 220, padding: '8px 12px',
+          background: '#1a1d21', color: '#f1ebd6',
+          border: '2px solid #5b8aa3', borderRadius: 8,
+          fontFamily: '"Courier New", monospace',
+          fontSize: 16, textAlign: 'center', letterSpacing: '2px',
+          textTransform: 'uppercase',
+        }}
+      />
+
+      <div style={{ marginTop: 12 }}>
+        <button onClick={submit} disabled={typed.length === 0} style={{
+          background: typed.length === 0 ? '#3a3d44' : '#5ba36f',
+          color: '#fff', border: 'none', borderRadius: 8,
+          padding: '10px 22px', fontSize: 16, fontWeight: 'bold',
+          fontFamily: '"Courier New", monospace', letterSpacing: '1px',
+          cursor: typed.length === 0 ? 'not-allowed' : 'pointer',
+        }}>✓ CHECK</button>
+      </div>
+    </div>
+  );
+}
 
 const backBtnStyle: React.CSSProperties = {
   background: 'transparent', color: '#f0c050',
