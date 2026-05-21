@@ -784,6 +784,24 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
             <div style={{ textAlign: 'center', marginBottom: 8, color: '#f0c050', fontSize: 13, fontWeight: 'bold', letterSpacing: '1px' }}>
               {question.subject.toUpperCase()} · LV {level} QUESTION · TRIES {attemptsLeft}
             </div>
+            {/* After a few wrong tries (attemptsLeft drops from 5 → 3 or
+                lower) show the hint right on the question so Addie doesn't
+                have to remember it from the last feedback flash. */}
+            {attemptsLeft <= 3 && question.hint && (
+              <div style={{
+                maxWidth: 640, margin: '0 auto 12px',
+                background: 'rgba(240,192,80,0.12)',
+                border: '2px dashed #f0c050',
+                borderRadius: 10,
+                padding: '8px 14px',
+                color: '#ffe6a8',
+                fontSize: 14,
+                textAlign: 'center',
+                letterSpacing: '0.5px',
+              }}>
+                💡 Hint: {question.hint}
+              </div>
+            )}
             {question.kind === 'spell' ? (
               <SpellPicturePanel
                 question={question}
