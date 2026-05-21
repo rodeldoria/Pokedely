@@ -108,6 +108,11 @@ const KANTO: [number, string, string[], number][] = [
   [132,'Ditto',['normal'],3],
   [133,'Eevee',['normal'],2],
   [134,'Vaporeon',['water'],3],[135,'Jolteon',['electric'],3],[136,'Flareon',['fire'],3],
+  // Fossil Pokémon — revived at the Fossil Lab from fossils found while mining
+  // or dropped by Team Rocket grunts. Rarity 3 because they're special.
+  [138,'Omanyte',['rock','water'],3],[139,'Omastar',['rock','water'],3],
+  [140,'Kabuto',['rock','water'],3],[141,'Kabutops',['rock','water'],3],
+  [142,'Aerodactyl',['rock','flying'],3],
   [196,'Espeon',['psychic'],3],[197,'Umbreon',['dark'],3],
   [470,'Leafeon',['grass'],3],[471,'Glaceon',['ice'],3],[700,'Sylveon',['fairy'],3],
 ];
