@@ -390,7 +390,7 @@ function update(
     gs.bJustPressed = false;
     gs.buildMode = !gs.buildMode;
     if (gs.buildMode) {
-      onToast(`🔨 Build mode ON — [/] to pick, F to place, B to exit`);
+      onToast(`🔨 Build mode ON — [/] pick · F place (or pick up) · B exit`);
     }
   }
   if (gs.bracketLeftJust) {
@@ -480,15 +480,16 @@ function update(
       // her feet) — let her walk off.
       if (Math.floor(gs.px) === tx && Math.floor(gs.py) === ty) return false;
     }
-    if (isSolid(t)) return true;
-    // Placed structures also act as collision when their kind is solid
-    // (fences, houses, statues, etc.). Walkable kinds (paths, bridges,
-    // saplings) pass through.
+    // Check placed structures FIRST so a walkable kind (bridge, path,
+    // sapling) on top of a normally-solid tile (water) lets Addie pass.
+    // This is what makes a bridge over water actually work.
     const placed = gs.state.placedStructures[`${gs.zoneId}:${tx},${ty}`];
-    if (placed && isPlacedSolid(placed)) {
+    if (placed) {
+      if (!isPlacedSolid(placed)) return false; // walkable placement wins over base tile
       if (Math.floor(gs.px) === tx && Math.floor(gs.py) === ty) return false;
       return true;
     }
+    if (isSolid(t)) return true;
     return false;
   };
   if (collTile(npx, gs.py)) npx = gs.px;
@@ -607,8 +608,27 @@ function update(
     const fty = Math.floor(gs.py) + dy;
     const frontKey = `${gs.zoneId}:${ftx},${fty}`;
 
-    // Build mode: F places the selected structure onto the front tile.
+    // Build mode: F picks up an existing structure in front, or places
+    // the selected one onto an empty front tile.
     if (gs.buildMode) {
+      const existing = gs.state.placedStructures[frontKey];
+      if (existing) {
+        // Pick up: refund one of that kind and remove from the world.
+        delete gs.state.placedStructures[frontKey];
+        gs.state.inventory[existing] = (gs.state.inventory[existing] || 0) + 1;
+        // Evict any roommate if the structure was a house, so the next
+        // house Addie places doesn't inherit an orphan resident.
+        if (existing === 'house' && gs.state.houseResidents[frontKey]) {
+          const next = { ...gs.state.houseResidents };
+          delete next[frontKey];
+          gs.state.houseResidents = next;
+        }
+        save(gs.state);
+        stateRef.current = gs.state;
+        const lbl = STRUCTURE_LABEL[existing];
+        gs.toast = { text: `🫳 Picked up ${lbl.emoji} ${lbl.name}!`, timer: 1.6 };
+        return;
+      }
       const kind = STRUCTURE_KINDS[gs.buildIdx];
       const count = structureCountFor(gs.state, kind);
       if (count <= 0) {
@@ -616,14 +636,21 @@ function update(
         gs.toast = { text: `You have no ${lbl.emoji} ${lbl.name} — craft one first!`, timer: 2 };
       } else {
         const tCode = map[fty]?.[ftx] as TileCode | undefined;
-        const tileOk = tCode !== undefined && !isSolid(tCode)
-          && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS;
-        const alreadyPlaced = !!gs.state.placedStructures[frontKey];
+        // Bridges are special: they're the one structure allowed on water
+        // (that's their whole purpose). Everything else needs solid ground.
+        const isBridgeOnWater = kind === 'bridge' && tCode === TILE.WATER;
+        const tileOk = tCode !== undefined && (
+          isBridgeOnWater
+          || (!isSolid(tCode) && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS)
+        );
         const onItem = gs.items.some(it => it.tx === ftx && it.ty === fty
           && !gs.state.worldItems[`${gs.zoneId}:${it.tx},${it.ty}`]);
         const onPlayer = Math.floor(gs.px) === ftx && Math.floor(gs.py) === fty;
-        if (!tileOk || alreadyPlaced || onItem || onPlayer) {
-          gs.toast = { text: `Can't build there — pick an empty grass/path tile!`, timer: 2 };
+        if (!tileOk || onItem || onPlayer) {
+          const hint = kind === 'bridge'
+            ? `Bridges go on water — face a water tile!`
+            : `Can't build there — pick an empty grass/path tile!`;
+          gs.toast = { text: hint, timer: 2 };
         } else {
           placeStructure(gs.state, gs.zoneId, ftx, fty, kind);
           stateRef.current = gs.state;
@@ -856,7 +883,19 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   // she's at a smaller y-coordinate. Without this a placed house always
   // sat in front of the player which looked wrong from the north side.
   const tallPlaced = new Set<StructureKind>(['house', 'statue', 'sign', 'lantern', 'berry_tree', 'flower_pot']);
-  const tallStructures: Array<{ kind: StructureKind; pxs: number; pys: number }> = [];
+  const tallStructures: Array<{ kind: StructureKind; pxs: number; pys: number; mask: number }> = [];
+  const neighborMask = (kind: StructureKind, x: number, y: number): number => {
+    // Bit order: 1=N, 2=E, 4=S, 8=W. Only used by kinds whose sprite
+    // should visually join with the same kind on an adjacent tile.
+    const sameAt = (nx: number, ny: number) =>
+      gs.state.placedStructures[`${gs.zoneId}:${nx},${ny}`] === kind;
+    let m = 0;
+    if (sameAt(x, y - 1)) m |= 1;
+    if (sameAt(x + 1, y)) m |= 2;
+    if (sameAt(x, y + 1)) m |= 4;
+    if (sameAt(x - 1, y)) m |= 8;
+    return m;
+  };
   for (const [key, kind] of Object.entries(gs.state.placedStructures)) {
     const [zone, coords] = key.split(':');
     if (zone !== gs.zoneId) continue;
@@ -864,10 +903,11 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     if (Number.isNaN(pxs) || Number.isNaN(pys)) continue;
     if (pxs < startTX - 1 || pxs > endTX + 1 || pys < startTY - 1 || pys > endTY + 1) continue;
     const k = kind as StructureKind;
+    const mask = neighborMask(k, pxs, pys);
     if (tallPlaced.has(k)) {
-      tallStructures.push({ kind: k, pxs, pys });
+      tallStructures.push({ kind: k, pxs, pys, mask });
     } else {
-      drawPlacedStructure(ctx, k, pxs * TS - camX, pys * TS - camY);
+      drawPlacedStructure(ctx, k, pxs * TS - camX, pys * TS - camY, mask);
     }
   }
 
@@ -887,7 +927,7 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
   // and behind when she's to the north.
   for (const t of tallStructures) {
     const sx = t.pxs * TS - camX, sy = t.pys * TS - camY;
-    sprites.push({ y: t.pys + 0.9, draw: () => drawPlacedStructure(ctx, t.kind, sx, sy) });
+    sprites.push({ y: t.pys + 0.9, draw: () => drawPlacedStructure(ctx, t.kind, sx, sy, t.mask) });
   }
 
   for (const a of gs.ambientMons) {
@@ -963,9 +1003,16 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     const fty = Math.floor(gs.py) + dy;
     const cx = ftx * TS - camX, cy = fty * TS - camY;
     const tCode = map[fty]?.[ftx] as TileCode | undefined;
-    const tileOk = tCode !== undefined && !isSolid(tCode)
-      && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS
-      && !gs.state.placedStructures[`${gs.zoneId}:${ftx},${fty}`];
+    const kindPreview = STRUCTURE_KINDS[gs.buildIdx];
+    const alreadyPlaced = !!gs.state.placedStructures[`${gs.zoneId}:${ftx},${fty}`];
+    // Mirror placement rules in update(): bridges are the one kind allowed
+    // on water; everything else requires a non-solid, non-water,
+    // non-tallgrass tile. In build mode, F on an already-placed tile
+    // becomes a pickup, so highlight that as valid too.
+    const isBridgeOnWater = kindPreview === 'bridge' && tCode === TILE.WATER;
+    const baseOk = tCode !== undefined && !isSolid(tCode)
+      && tCode !== TILE.WATER && tCode !== TILE.TALLGRASS;
+    const tileOk = alreadyPlaced || isBridgeOnWater || baseOk;
     const pulse = 0.4 + Math.sin(Date.now() / 220) * 0.2;
     ctx.fillStyle = tileOk ? `rgba(124,252,124,${pulse})` : `rgba(255,90,90,${pulse})`;
     ctx.fillRect(cx, cy, TS, TS);
@@ -975,9 +1022,11 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
 
     const kind = STRUCTURE_KINDS[gs.buildIdx];
     const count = structureCountFor(gs.state, kind);
-    if (count > 0 && tileOk) {
+    // Only ghost the *placement* preview when the tile is genuinely empty —
+    // not when we're about to pick up an existing structure.
+    if (count > 0 && tileOk && !alreadyPlaced) {
       ctx.globalAlpha = 0.55;
-      drawPlacedStructure(ctx, kind, cx, cy);
+      drawPlacedStructure(ctx, kind, cx, cy, 0);
       ctx.globalAlpha = 1;
     }
 
@@ -1034,7 +1083,19 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     ctx.font = 'bold 11px "Segoe UI"';
     ctx.fillStyle = count > 0 ? '#ffd54a' : '#c97a5a';
     ctx.textAlign = 'left';
-    ctx.fillText(`🔨 ${lbl.emoji} ${lbl.name} — ${count > 0 ? 'press F to place' : "you don't have any — craft one (C)"}`, 8, hudY + 12);
+    // If Addie is facing a placed structure, swap the hint to "pick up"
+    // so it's obvious that F removes it (and refunds her inventory).
+    const dxH = gs.facing === 'left' ? -1 : gs.facing === 'right' ? 1 : 0;
+    const dyH = gs.facing === 'up' ? -1 : gs.facing === 'down' ? 1 : 0;
+    const ftxH = Math.floor(gs.px) + dxH, ftyH = Math.floor(gs.py) + dyH;
+    const inFront = gs.state.placedStructures[`${gs.zoneId}:${ftxH},${ftyH}`];
+    if (inFront) {
+      const fl = STRUCTURE_LABEL[inFront];
+      ctx.fillStyle = '#ffd54a';
+      ctx.fillText(`🫳 F: Pick up ${fl.emoji} ${fl.name}`, 8, hudY + 12);
+    } else {
+      ctx.fillText(`🔨 ${lbl.emoji} ${lbl.name} — ${count > 0 ? 'press F to place' : "you don't have any — craft one (C)"}`, 8, hudY + 12);
+    }
     ctx.fillStyle = '#9d7a3a';
     ctx.textAlign = 'right';
     ctx.fillText('press B to exit', CANVAS_W - 8, hudY + 12);
@@ -1091,21 +1152,48 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
 // ─── PLACED STRUCTURES ────────────────────────────────────────────────────────
 // Each kind has a tiny per-tile sprite. They share a soft drop shadow so
 // they read as sitting on the grass rather than floating above it.
-function drawPlacedStructure(ctx: CanvasRenderingContext2D, kind: StructureKind, sx: number, sy: number) {
-  ctx.fillStyle = 'rgba(0,0,0,0.22)';
-  ctx.beginPath();
-  ctx.ellipse(sx + 16, sy + 28, 11, 3, 0, 0, Math.PI * 2);
-  ctx.fill();
+function drawPlacedStructure(ctx: CanvasRenderingContext2D, kind: StructureKind, sx: number, sy: number, mask: number = 0) {
+  // Neighbor bits: 1=N, 2=E, 4=S, 8=W. Connect-aware kinds (fence, path,
+  // bridge) extend their sprite all the way to the tile edge on each side
+  // that has a same-kind neighbor, so adjacent placements read as one
+  // continuous structure instead of separate tiles with gaps.
+  const nN = (mask & 1) !== 0, nE = (mask & 2) !== 0;
+  const nS = (mask & 4) !== 0, nW = (mask & 8) !== 0;
+  // Drop a soft shadow under non-flat kinds only; bridges and paths sit
+  // flat on the ground and a shadow under them looks wrong.
+  if (kind !== 'bridge' && kind !== 'path_tile') {
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.beginPath();
+    ctx.ellipse(sx + 16, sy + 28, 11, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   switch (kind) {
     case 'fence': {
-      ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 2, sy + 18, 28, 3);
-      ctx.fillRect(sx + 2, sy + 24, 28, 3);
+      // Rails extend to the tile edge when a fence sits to the E or W.
+      const x0 = nW ? sx : sx + 2;
+      const x1 = nE ? sx + TS : sx + TS - 2;
+      ctx.fillStyle = '#8b5a2b';
+      ctx.fillRect(x0, sy + 18, x1 - x0, 3);
+      ctx.fillRect(x0, sy + 24, x1 - x0, 3);
       ctx.fillStyle = '#6e4218';
-      for (let i = 0; i < 4; i++) ctx.fillRect(sx + 4 + i * 8, sy + 12, 3, 16);
+      // Vertical posts only when there isn't a same fence directly above/below
+      // (so horizontal runs look like one continuous fence).
+      if (!nN && !nS) {
+        for (let i = 0; i < 4; i++) ctx.fillRect(sx + 4 + i * 8, sy + 12, 3, 16);
+      } else {
+        // Verticals connecting up/down neighbors.
+        const y0 = nN ? sy : sy + 12;
+        const y1 = nS ? sy + TS : sy + 28;
+        ctx.fillRect(sx + 14, y0, 3, y1 - y0);
+      }
       break;
     }
     case 'path_tile': {
-      ctx.fillStyle = '#b8a888'; ctx.fillRect(sx + 2, sy + 2, TS - 4, TS - 4);
+      // Stretch the path to fully cover any shared edge with another path
+      // so a chain of path tiles draws as one continuous walkway.
+      const x0 = nW ? sx : sx + 2, x1 = nE ? sx + TS : sx + TS - 2;
+      const y0 = nN ? sy : sy + 2, y1 = nS ? sy + TS : sy + TS - 2;
+      ctx.fillStyle = '#b8a888'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       ctx.fillStyle = '#9a8a6a';
       ctx.fillRect(sx + 5, sy + 6, 4, 3); ctx.fillRect(sx + 14, sy + 12, 5, 3);
       ctx.fillRect(sx + 22, sy + 20, 4, 3); ctx.fillRect(sx + 8, sy + 22, 3, 3);
@@ -1165,10 +1253,31 @@ function drawPlacedStructure(ctx: CanvasRenderingContext2D, kind: StructureKind,
       break;
     }
     case 'bridge': {
-      ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 1, sy + 6, TS - 2, TS - 12);
-      ctx.fillStyle = '#6e4218';
-      for (let i = 0; i < 5; i++) ctx.fillRect(sx + 2 + i * 6, sy + 6, 1, TS - 12);
-      ctx.fillRect(sx + 1, sy + 6, TS - 2, 1); ctx.fillRect(sx + 1, sy + TS - 7, TS - 2, 1);
+      // Detect whether the run goes horizontally (E/W neighbors) or
+      // vertically (N/S neighbors). A standalone bridge defaults to
+      // horizontal so it spans naturally across a 1-tile-wide stream.
+      const vertical = (nN || nS) && !nE && !nW;
+      if (vertical) {
+        const y0 = nN ? sy : sy + 1, y1 = nS ? sy + TS : sy + TS - 1;
+        const x0 = sx + 6, x1 = sx + TS - 6;
+        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        ctx.fillStyle = '#6e4218';
+        for (let i = 0; i < 5; i++) ctx.fillRect(x0, y0 + 2 + i * 6, x1 - x0, 1);
+        // Side rails so it reads as a bridge from the top-down view.
+        ctx.fillStyle = '#5a3010';
+        ctx.fillRect(x0 - 1, y0, 1, y1 - y0);
+        ctx.fillRect(x1, y0, 1, y1 - y0);
+      } else {
+        const x0 = nW ? sx : sx + 1, x1 = nE ? sx + TS : sx + TS - 1;
+        const y0 = sy + 6, y1 = sy + TS - 6;
+        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        ctx.fillStyle = '#6e4218';
+        for (let i = 0; i < 5; i++) ctx.fillRect(x0 + 2 + i * 6, y0, 1, y1 - y0);
+        // Rails along the long edges.
+        ctx.fillStyle = '#5a3010';
+        ctx.fillRect(x0, y0 - 1, x1 - x0, 1);
+        ctx.fillRect(x0, y1, x1 - x0, 1);
+      }
       break;
     }
     case 'house': {

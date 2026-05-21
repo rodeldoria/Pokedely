@@ -118,8 +118,8 @@ const empty = (): TrainerState => ({
     lumber: 6, stone: 6, seed: 3, water: 0, metal: 1,
     // Starter pack of pre-crafted placeables so build mode (B) is
     // immediately playable on a fresh save.
-    fence: 4, berry_tree: 0, path_tile: 4, house: 1,
-    sapling: 2, statue: 0, lantern: 1, sign: 1, bridge: 0, flower_pot: 2,
+    fence: 4, berry_tree: 0, path_tile: 4, house: 2,
+    sapling: 2, statue: 0, lantern: 1, sign: 1, bridge: 3, flower_pot: 2,
   },
   placedStructures: {},
   houseResidents: {},
@@ -191,11 +191,12 @@ function grantStarterPack(state: TrainerState): boolean {
   inv.metal = Math.max(inv.metal, 1);
   inv.fence = Math.max(inv.fence, 4);
   inv.path_tile = Math.max(inv.path_tile, 4);
-  inv.house = Math.max(inv.house, 1);
+  inv.house = Math.max(inv.house, 2);
   inv.sapling = Math.max(inv.sapling, 2);
   inv.lantern = Math.max(inv.lantern, 1);
   inv.sign = Math.max(inv.sign, 1);
   inv.flower_pot = Math.max(inv.flower_pot, 2);
+  inv.bridge = Math.max(inv.bridge, 3);
   return true;
 }
 
