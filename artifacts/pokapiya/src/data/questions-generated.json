@@ -3222,6 +3222,22 @@
       { "subject": "Spell the Picture", "kind": "spell", "image": "📖", "answer": "BOOK",  "prompt": "Type the name of this picture:", "choices": ["BOOK"],  "answerIndex": 0, "hint": "Starts with B." },
       { "subject": "Spell the Picture", "kind": "spell", "image": "⚽", "answer": "BALL",  "prompt": "Type the name of this picture:", "choices": ["BALL"],  "answerIndex": 0, "hint": "Starts with B." },
       { "subject": "Spell the Picture", "kind": "spell", "image": "🥚", "answer": "EGG",   "prompt": "Type the name of this picture:", "choices": ["EGG"],   "answerIndex": 0, "hint": "Starts with E." }
+    ],
+    "fractions": [
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 1, "fractionDen": 4, "prompt": "How much of the pie is colored?", "choices": ["1/4","1/2","1/3","3/4"], "answerIndex": 0, "hint": "One slice out of four." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 1, "fractionDen": 2, "prompt": "How much of the pie is colored?", "choices": ["1/2","1/4","2/3","3/4"], "answerIndex": 0, "hint": "Half the pie." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 1, "fractionDen": 3, "prompt": "How much of the pie is colored?", "choices": ["1/3","1/2","1/4","2/3"], "answerIndex": 0, "hint": "One slice out of three." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 3, "fractionDen": 4, "prompt": "How much of the pie is colored?", "choices": ["3/4","1/4","2/4","2/3"], "answerIndex": 0, "hint": "Three slices out of four." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 2, "fractionDen": 4, "prompt": "How much of the pie is colored?", "choices": ["2/4","1/4","3/4","2/3"], "answerIndex": 0, "hint": "Two slices out of four (the same as a half!)." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 2, "fractionDen": 3, "prompt": "How much of the pie is colored?", "choices": ["2/3","1/3","1/2","3/4"], "answerIndex": 0, "hint": "Two slices out of three." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 1, "fractionDen": 6, "prompt": "How much of the pie is colored?", "choices": ["1/6","1/4","1/3","1/2"], "answerIndex": 0, "hint": "One slice out of six." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 3, "fractionDen": 6, "prompt": "How much of the pie is colored?", "choices": ["3/6","2/6","4/6","1/6"], "answerIndex": 0, "hint": "Three slices out of six (same as a half!)." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 1, "fractionDen": 8, "prompt": "How much of the pie is colored?", "choices": ["1/8","1/4","2/8","1/6"], "answerIndex": 0, "hint": "One slice out of eight." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 4, "fractionDen": 8, "prompt": "How much of the pie is colored?", "choices": ["4/8","2/8","3/8","6/8"], "answerIndex": 0, "hint": "Four out of eight (a half!)." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 5, "fractionDen": 8, "prompt": "How much of the pie is colored?", "choices": ["5/8","3/8","4/8","6/8"], "answerIndex": 0, "hint": "Count the colored slices: five out of eight." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 2, "fractionDen": 6, "prompt": "How much of the pie is colored?", "choices": ["2/6","1/6","3/6","2/3"], "answerIndex": 0, "hint": "Two slices out of six." },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 4, "fractionDen": 4, "prompt": "How much of the pie is colored?", "choices": ["4/4","3/4","2/4","1/2"], "answerIndex": 0, "hint": "The whole pie!" },
+      { "subject": "Fractions", "kind": "fraction", "fractionNum": 3, "fractionDen": 8, "prompt": "How much of the pie is colored?", "choices": ["3/8","2/8","4/8","5/8"], "answerIndex": 0, "hint": "Three slices out of eight." }
     ]
   }
 }

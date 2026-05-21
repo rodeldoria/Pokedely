@@ -795,6 +795,11 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
                   textAlign: 'center', color: '#f1ebd6', fontSize: 18, fontWeight: 'bold',
                   marginBottom: 14, lineHeight: 1.4,
                 }}>{question.prompt}</div>
+                {question.kind === 'fraction' && question.fractionNum != null && question.fractionDen != null && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+                    <FractionPie num={question.fractionNum} den={question.fractionDen} size={180} />
+                  </div>
+                )}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, maxWidth: 800, margin: '0 auto' }}>
                   {question.choices.map((choice, i) => (
                     <button key={i} onClick={() => handleAnswer(i)} style={{
@@ -875,6 +880,58 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
 }
 
 const CHOICE_BORDERS = ['#5ba36f', '#5b8aa3', '#a37a4a', '#8a5ba3'];
+
+// Pie-chart picture for fraction questions. Renders `den` equal wedges and
+// colors the first `num` of them. Each wedge has a black outline so the
+// shaded slices are easy to count, and a thin label shows num/den under it.
+function FractionPie({ num, den, size = 180 }: { num: number; den: number; size?: number }) {
+  const r = size / 2 - 6;
+  const cx = size / 2;
+  const cy = size / 2;
+  const FILL = '#f0c050';
+  const EMPTY = '#fdf3d6';
+  const STROKE = '#1a0d00';
+
+  // Build wedge paths. For den === 1 we draw a single filled circle.
+  const wedges: { d: string; filled: boolean }[] = [];
+  if (den <= 1) {
+    wedges.push({ d: `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${r * 2} 0 a ${r} ${r} 0 1 0 ${-r * 2} 0 Z`, filled: num >= 1 });
+  } else {
+    const slice = (2 * Math.PI) / den;
+    for (let i = 0; i < den; i++) {
+      // Start at top (-PI/2) and sweep clockwise so slice 1 is the top wedge.
+      const a0 = -Math.PI / 2 + i * slice;
+      const a1 = a0 + slice;
+      const x0 = cx + r * Math.cos(a0);
+      const y0 = cy + r * Math.sin(a0);
+      const x1 = cx + r * Math.cos(a1);
+      const y1 = cy + r * Math.sin(a1);
+      const large = slice > Math.PI ? 1 : 0;
+      wedges.push({
+        d: `M ${cx} ${cy} L ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} Z`,
+        filled: i < num,
+      });
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+        style={{ filter: 'drop-shadow(0 4px 4px rgba(0,0,0,0.35))' }}>
+        {/* Plate */}
+        <circle cx={cx} cy={cy} r={r + 4} fill="#5a3a18" />
+        {wedges.map((w, i) => (
+          <path key={i} d={w.d} fill={w.filled ? FILL : EMPTY} stroke={STROKE} strokeWidth={2} />
+        ))}
+      </svg>
+      <div style={{
+        marginTop: 6, color: '#90c4d8', fontSize: 12, fontWeight: 'bold', letterSpacing: '1px',
+      }}>
+        {num} OF {den} {den === 1 ? 'PIECE' : 'PIECES'}
+      </div>
+    </div>
+  );
+}
 
 // Spell-the-picture panel: shows an emoji "picture" and a typing input with
 // one box per letter of the answer. Addie can type freely or click letters;

@@ -8,13 +8,17 @@ export interface Question {
   subject: string;
   hint?: string;
   // 'choice' (default) shows multiple-choice buttons. 'spell' shows a picture
-  // (emoji) and Addie types the answer. For 'spell', `answer` is the
-  // expected word (case-insensitive); `image` is the emoji to display.
-  // `choices` should be a single-element array `[answer]` so existing
-  // feedback like "the answer was …" still works.
-  kind?: 'choice' | 'spell';
+  // (emoji) and Addie types the answer. 'fraction' shows a pie chart with
+  // `fractionNum` slices of `fractionDen` shaded, then uses the normal
+  // multiple-choice UI for picking the matching fraction (e.g. "1/4").
+  // For 'spell', `answer` is the expected word (case-insensitive); `image`
+  // is the emoji to display. `choices` should be a single-element array
+  // `[answer]` so existing feedback like "the answer was …" still works.
+  kind?: 'choice' | 'spell' | 'fraction';
   image?: string;
   answer?: string;
+  fractionNum?: number;
+  fractionDen?: number;
 }
 
 interface Bank {
@@ -44,11 +48,11 @@ function shuffleChoices(q: Question): Question {
 const EASY = ['colors', 'shapes', 'counting', 'animals', 'opposites', 'addie', 'family', 'spell_picture'];
 const MEDIUM = [
   'spelling', 'alphabet', 'rhymes', 'patterns', 'categorize', 'science',
-  'bugs', 'planets'
+  'bugs', 'planets', 'fractions'
 ];
 const HARD = [
   'math', 'subtraction', 'reading',
-  'multiplication', 'computer_science', 'reading_stories'
+  'multiplication', 'computer_science', 'reading_stories', 'fractions'
 ];
 
 // 'family' is intentionally added to nearly every type so the safety
@@ -56,24 +60,24 @@ const HARD = [
 // do when lost) come up regularly no matter what wild Pokémon Addie
 // is battling. These are real-world safety facts she needs to know.
 const TYPE_TO_CATEGORY: Record<string, string[]> = {
-  grass:   ['animals','science','spelling','addie','bugs','family','spell_picture'],
+  grass:   ['animals','science','spelling','addie','bugs','family','spell_picture','fractions'],
   bug:     ['animals','spelling','counting','bugs','science','family','spell_picture'],
-  water:   ['animals','science','categorize','reading_stories','family','spell_picture'],
-  fire:    ['colors','science','opposites','planets','family','spell_picture'],
-  electric:['science','patterns','math','addie','computer_science','multiplication','family'],
-  ice:     ['science','opposites','colors','planets','family','spell_picture'],
-  steel:   ['shapes','patterns','math','computer_science','multiplication','family'],
-  rock:    ['shapes','science','categorize','planets','family'],
-  ground:  ['science','shapes','counting','bugs','family','spell_picture'],
+  water:   ['animals','science','categorize','reading_stories','family','spell_picture','fractions'],
+  fire:    ['colors','science','opposites','planets','family','spell_picture','fractions'],
+  electric:['science','patterns','math','addie','computer_science','multiplication','family','fractions'],
+  ice:     ['science','opposites','colors','planets','family','spell_picture','fractions'],
+  steel:   ['shapes','patterns','math','computer_science','multiplication','family','fractions'],
+  rock:    ['shapes','science','categorize','planets','family','fractions'],
+  ground:  ['science','shapes','counting','bugs','family','spell_picture','fractions'],
   flying:  ['animals','patterns','reading','reading_stories','family','spell_picture'],
-  fighting:['math','subtraction','opposites','multiplication','family'],
+  fighting:['math','subtraction','opposites','multiplication','family','fractions'],
   poison:  ['categorize','opposites','colors','bugs','family','spell_picture'],
-  psychic: ['patterns','alphabet','reading','computer_science','reading_stories','family'],
-  ghost:   ['rhymes','alphabet','patterns','computer_science','family'],
-  dragon:  ['math','subtraction','reading','multiplication','reading_stories','family'],
+  psychic: ['patterns','alphabet','reading','computer_science','reading_stories','family','fractions'],
+  ghost:   ['rhymes','alphabet','patterns','computer_science','family','fractions'],
+  dragon:  ['math','subtraction','reading','multiplication','reading_stories','family','fractions'],
   fairy:   ['rhymes','spelling','colors','addie','family','spell_picture'],
-  normal:  ['spelling','counting','animals','addie','reading_stories','family','spell_picture'],
-  dark:    ['opposites','rhymes','alphabet','computer_science','family'],
+  normal:  ['spelling','counting','animals','addie','reading_stories','family','spell_picture','fractions'],
+  dark:    ['opposites','rhymes','alphabet','computer_science','family','fractions'],
 };
 
 const ALL_CATEGORIES = Object.keys(typedBank.categories);
@@ -84,10 +88,12 @@ export function questionFor(pokemon: Pokemon, level = 1): Question {
   const primary = pokemon?.types?.[0] || 'normal';
   let typed = TYPE_TO_CATEGORY[primary] || ['spelling','counting','math'];
 
-  // Filter by difficulty unlocked at this level
+  // Filter by difficulty unlocked at this level. Curve tightened so the game
+  // ramps up sooner — MEDIUM at Lv 2, HARD at Lv 5 — and biases harder
+  // categories more aggressively once they're unlocked.
   let allowedDifficulty: string[];
-  if (level <= 3) allowedDifficulty = EASY;
-  else if (level <= 8) allowedDifficulty = [...EASY, ...MEDIUM];
+  if (level <= 1) allowedDifficulty = EASY;
+  else if (level <= 4) allowedDifficulty = [...EASY, ...MEDIUM];
   else allowedDifficulty = [...EASY, ...MEDIUM, ...HARD];
 
   // 60% chance use a type-matched category that's also in allowed; else any allowed
@@ -99,14 +105,14 @@ export function questionFor(pokemon: Pokemon, level = 1): Question {
     pool = allowedDifficulty;
   }
 
-  // For mid/hard levels, bias toward harder categories
-  if (level >= 6) {
+  // For mid/hard levels, bias toward harder categories (kicks in earlier now).
+  if (level >= 3) {
     const harder = pool.filter(c => MEDIUM.includes(c) || HARD.includes(c));
-    if (harder.length && Math.random() < 0.5) pool = harder;
+    if (harder.length && Math.random() < 0.65) pool = harder;
   }
-  if (level >= 12) {
+  if (level >= 7) {
     const hardest = pool.filter(c => HARD.includes(c));
-    if (hardest.length && Math.random() < 0.4) pool = hardest;
+    if (hardest.length && Math.random() < 0.55) pool = hardest;
   }
 
   let categoryKey = pickOne(pool);
