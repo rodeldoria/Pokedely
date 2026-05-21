@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getLevel, xpToNextLevel, type TrainerState } from '../game/save';
 import { subscribeCloudStatus, type CloudStatus } from '../game/cloudSave';
 import { liveSpriteUrl, spriteUrl } from '../data/pokedex';
+import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
 
 interface Props {
   state: TrainerState;
@@ -34,6 +35,7 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
   const { have, need } = xpToNextLevel(state);
   const progressInLevel = state.stats.correct - (level - 1) * 8;
   const xpPct = Math.min(100, (progressInLevel / 8) * 100);
+  const av = state.avatar || DEFAULT_AVATAR;
 
   return (
     <>
@@ -46,6 +48,16 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
         fontFamily: '"Segoe UI", sans-serif', backdropFilter: 'blur(4px)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <img
+            src={avatarUrl({ style: av.style, seed: av.seed, size: 64 })}
+            alt="avatar"
+            title={`${av.style} · ${av.seed}`}
+            style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: '#fff7e0', border: '2px solid #ffd54a',
+              imageRendering: av.style === 'pixel-art' ? 'pixelated' : 'auto',
+            }}
+          />
           <div style={{
             background: '#d63946', color: '#fff', borderRadius: '50%',
             width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',

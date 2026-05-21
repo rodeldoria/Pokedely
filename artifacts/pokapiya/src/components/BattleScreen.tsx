@@ -4,6 +4,7 @@ import { displayName, spriteUrl, backSpriteUrl, homeSpriteUrl, animatedSpriteUrl
 import { questionFor, type Question } from '../data/stem';
 import { AddieSprite } from './AddieSprite';
 import { TrainerSprite } from './TrainerSprite';
+import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
 import type { NPCTrainer } from '../game/world';
 import {
   recordAnswer, recordCatch, useBall, useBerry, getLevel,
@@ -512,6 +513,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           message={introMsg}
           addieLevel={level}
           wild={wild}
+          state={state}
           trainerName={trainerName}
           trainerKind={trainerKind}
         />
@@ -1225,8 +1227,45 @@ const TRAINER_TAUNTS: Record<NPCTrainer['kind'], string> = {
   lass:   "Don't cry when you lose!",
 };
 
-function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
-  message: string; addieLevel: number; wild: Pokemon;
+function AddieAvatarOrSprite({ state }: { state: TrainerState }) {
+  const av = state.avatar || DEFAULT_AVATAR;
+  const [failed, setFailed] = useState(false);
+  if (failed) return <AddieSprite size={180} facing="right" />;
+  return (
+    <img
+      src={avatarUrl({ style: av.style, seed: av.seed, size: 200 })}
+      alt="Addie"
+      onError={() => setFailed(true)}
+      style={{
+        width: 180, height: 180, borderRadius: 24,
+        background: '#fff7e0', border: '4px solid #ffd54a',
+        imageRendering: av.style === 'pixel-art' ? 'pixelated' : 'auto',
+        filter: 'drop-shadow(0 6px 4px rgba(0,0,0,0.35))',
+      }}
+    />
+  );
+}
+
+function TrainerAvatarOrSprite({ trainerId, kind }: { trainerId: string; kind: NPCTrainer['kind'] }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <TrainerSprite kind={kind} size={180} facing="left" />;
+  return (
+    <img
+      src={avatarUrl({ style: 'pixel-art', seed: `trainer-${trainerId}`, size: 200, flip: true })}
+      alt="Trainer"
+      onError={() => setFailed(true)}
+      style={{
+        width: 180, height: 180, borderRadius: 24,
+        background: '#fff7e0', border: '4px solid #ffd54a',
+        imageRendering: 'pixelated',
+        filter: 'drop-shadow(0 6px 4px rgba(0,0,0,0.35))',
+      }}
+    />
+  );
+}
+
+function SendOutIntro({ message, addieLevel, wild, state, trainerName, trainerKind }: {
+  message: string; addieLevel: number; wild: Pokemon; state: TrainerState;
   trainerName?: string; trainerKind?: NPCTrainer['kind'];
 }) {
   return (
@@ -1256,7 +1295,7 @@ function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
         padding: '0 60px', position: 'relative',
       }}>
         <div style={{ textAlign: 'center', animation: 'slideInLeft 0.5s ease-out' }}>
-          <AddieSprite size={180} facing="right" />
+          <AddieAvatarOrSprite state={state} />
           <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
             Addie · Lv. {addieLevel}
           </div>
@@ -1309,7 +1348,7 @@ function SendOutIntro({ message, addieLevel, wild, trainerName, trainerKind }: {
                     borderLeft: '8px solid #fff',
                   }} />
                 </div>
-                <TrainerSprite kind={trainerKind} size={180} facing="left" />
+                <TrainerAvatarOrSprite trainerId={trainerName || trainerKind} kind={trainerKind} />
               </div>
               <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
                 {trainerName}

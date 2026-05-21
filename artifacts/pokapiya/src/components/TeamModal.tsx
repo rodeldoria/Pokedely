@@ -1,9 +1,11 @@
 import type { TrainerState } from '../game/save';
 import { displayName, liveSpriteUrl, spriteUrl } from '../data/pokedex';
+import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
 
 interface Props {
   state: TrainerState;
   onClose: () => void;
+  onChangeAvatar?: () => void;
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -14,9 +16,10 @@ const TYPE_COLORS: Record<string, string> = {
   steel:'#94a3b8',fairy:'#f9a8d4',
 };
 
-export default function TeamModal({ state, onClose }: Props) {
+export default function TeamModal({ state, onClose, onChangeAvatar }: Props) {
   const total = state.stats.correct + state.stats.wrong;
   const acc = total > 0 ? Math.round((state.stats.correct / total) * 100) : 100;
+  const av = state.avatar || DEFAULT_AVATAR;
 
   return (
     <div style={{
@@ -29,11 +32,36 @@ export default function TeamModal({ state, onClose }: Props) {
         padding: '32px', maxWidth: '760px', width: '90vw',
         boxShadow: '0 0 60px rgba(255,213,74,0.15)',
       }}>
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h2 style={{ color: '#ffd54a', fontSize: '28px', margin: 0 }}>🌸 Addie's Team</h2>
-          <p style={{ color: '#9d7a3a', margin: '8px 0 0' }}>
-            Caught: {state.stats.caught} · STEM Accuracy: {acc}% · Box: {state.box.length}
-          </p>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 16,
+          justifyContent: 'center', marginBottom: 20,
+        }}>
+          <img
+            src={avatarUrl({ style: av.style, seed: av.seed, size: 96 })}
+            alt="avatar"
+            style={{
+              width: 72, height: 72, borderRadius: 14,
+              background: '#fff7e0', border: '2px solid #ffd54a',
+              imageRendering: av.style === 'pixel-art' ? 'pixelated' : 'auto',
+            }}
+          />
+          <div style={{ textAlign: 'left' }}>
+            <h2 style={{ color: '#ffd54a', fontSize: '28px', margin: 0 }}>🌸 Addie's Team</h2>
+            <p style={{ color: '#9d7a3a', margin: '4px 0 0', fontSize: 13 }}>
+              Caught: {state.stats.caught} · STEM Accuracy: {acc}% · Box: {state.box.length}
+            </p>
+            {onChangeAvatar && (
+              <button
+                onClick={onChangeAvatar}
+                style={{
+                  marginTop: 6,
+                  background: '#b85cff', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '4px 12px',
+                  fontWeight: 'bold', cursor: 'pointer', fontSize: 12,
+                }}
+              >🎨 Change avatar</button>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: 24 }}>

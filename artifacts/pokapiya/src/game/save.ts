@@ -1,5 +1,6 @@
 import type { Pokemon } from '../data/pokedex';
 import { ZONE_IDS, type ZoneId } from './world';
+import { DEFAULT_AVATAR, type AvatarStyle } from '../data/avatar';
 
 export interface PartyMember {
   id: number;
@@ -67,6 +68,9 @@ export interface TrainerState {
   visitedCenter: number;
   starterChosen: boolean;
   currentZone: ZoneId;
+  // Addie's chosen DiceBear avatar. Optional for backward compat — code
+  // reading this should fall back to DEFAULT_AVATAR when absent.
+  avatar?: { style: AvatarStyle; seed: string };
 }
 
 const KEY = 'pokapiya.save.v4';
@@ -126,6 +130,7 @@ const empty = (): TrainerState => ({
   visitedCenter: 0,
   starterChosen: false,
   currentZone: 'town',
+  avatar: { ...DEFAULT_AVATAR },
 });
 
 // Migration: rewrite legacy unprefixed `x,y` tile keys to `town:x,y`.

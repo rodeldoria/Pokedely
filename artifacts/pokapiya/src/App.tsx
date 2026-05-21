@@ -6,6 +6,7 @@ import PokeCenterModal from './components/PokeCenterModal';
 import PokedexModal from './components/PokedexModal';
 import PCModal from './components/PCModal';
 import StarterModal from './components/StarterModal';
+import AvatarPickerModal from './components/AvatarPickerModal';
 import OakIntro from './components/OakIntro';
 import HUD from './components/HUD';
 import { load, save, defeatTrainer, earnCoins, type TrainerState } from './game/save';
@@ -93,6 +94,7 @@ export default function App() {
   }, [wildPokemon, currentTrainer, showToast]);
 
   const [evoPending, setEvoPending] = useState<PendingEvolution | null>(null);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
 
   const handleStateChange = useCallback((newState: TrainerState) => {
     stateRef.current = newState;
@@ -257,7 +259,26 @@ export default function App() {
       )}
 
       {screen === 'team' && (
-        <TeamModal state={trainerState} onClose={() => setScreen('world')} />
+        <TeamModal
+          state={trainerState}
+          onClose={() => setScreen('world')}
+          onChangeAvatar={() => setAvatarPickerOpen(true)}
+        />
+      )}
+
+      {avatarPickerOpen && (
+        <AvatarPickerModal
+          current={trainerState.avatar || { style: 'pixel-art', seed: 'Addie' }}
+          onClose={() => setAvatarPickerOpen(false)}
+          onSave={(next) => {
+            stateRef.current.avatar = next;
+            save(stateRef.current);
+            queueCloudSave(stateRef.current);
+            setAvatarPickerOpen(false);
+            showToast('✨ New look saved!');
+            forceUpdate(n => n + 1);
+          }}
+        />
       )}
 
       {screen === 'pokedex' && (

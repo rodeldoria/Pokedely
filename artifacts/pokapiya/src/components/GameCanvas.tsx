@@ -3,6 +3,7 @@ import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adja
 import { spriteUrl, pickRandom, byId, pickByType, pickForZone, maxDexForLevel, displayName, type Pokemon } from '../data/pokedex';
 import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeStanding, isRockIntact, setZone, getLevel, placeStructure, isPlacedSolid, STRUCTURE_KINDS, STRUCTURE_LABEL, structureCountFor, type StructureKind, type TrainerState } from '../game/save';
 import { getTrainerPortrait, preloadAllTrainerPortraits } from './TrainerSprite';
+import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
 
 const TS = 32;
 // Internal canvas resolution. Smaller than the on-screen size on purpose:
@@ -67,7 +68,7 @@ interface AmbientMon {
   greet: string; img: HTMLImageElement | null; bobTimer: number;
 }
 interface ItemSprite { tx: number; ty: number; type: string; bobTimer: number; }
-interface TrainerNPC extends NPCTrainer { img: HTMLImageElement | null; bobTimer: number; }
+interface TrainerNPC extends NPCTrainer { img: HTMLImageElement | null; avatarImg: HTMLImageElement | null; bobTimer: number; }
 
 interface GameState {
   worldMap: WorldMap;
@@ -111,6 +112,11 @@ interface GameState {
   posHistory: { x: number; y: number; facing: GameState['facing'] }[];
   followerImg: HTMLImageElement | null;
   followerId: number | null;
+  // Addie's DiceBear avatar, loaded for the overworld player sprite.
+  // Re-checked each frame against `playerAvatarKey` so picking a new
+  // avatar in the modal reloads without a zone reset.
+  playerAvatarImg: HTMLImageElement | null;
+  playerAvatarKey: string;
   // Pre-rendered static tile layer for the current zone. Built once per
   // zone load and blitted each frame instead of redrawing hundreds of
   // path/arc operations per tile (flowers, tallgrass, path noise, sand,
@@ -184,7 +190,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       encounterCooldown: 0,
       lastTileKey: '',
       ambientMons: makeAmbientMons(initialZone, worldMap),
-      trainers: trainers.map(t => ({ ...t, img: null, bobTimer: Math.random() * Math.PI * 2 })),
+      trainers: trainers.map(t => ({ ...t, img: null, avatarImg: null, bobTimer: Math.random() * Math.PI * 2 })),
       items: mapItems.map(it => ({ tx: it.x, ty: it.y, type: it.type, bobTimer: Math.random() * Math.PI * 2 })),
       images: new Map(),
       speech: null, toast: null,
@@ -196,6 +202,8 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       posHistory: [],
       followerImg: null,
       followerId: null,
+      playerAvatarImg: null,
+      playerAvatarKey: '',
       staticLayer: null,
     };
     gs.staticLayer = buildStaticLayer(worldMap);
@@ -203,9 +211,33 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
 
     const loadEntitySprites = () => {
       for (const a of gs.ambientMons) loadImg(spriteUrl(a.id), gs, img => { a.img = img; });
-      for (const t of gs.trainers) loadImg(spriteUrl(t.pokemonId), gs, img => { t.img = img; });
+      for (const t of gs.trainers) {
+        loadImg(spriteUrl(t.pokemonId), gs, img => { t.img = img; });
+        // DiceBear avatar per trainer — seeded by t.id so each trainer
+        // gets a unique human face even when several share a kind.
+        loadImg(
+          avatarUrl({ style: 'pixel-art', seed: `trainer-${t.id}`, size: 64, flip: true }),
+          gs,
+          img => { t.avatarImg = img; },
+        );
+      }
     };
     loadEntitySprites();
+    // Initial player-avatar load
+    const refreshPlayerAvatar = () => {
+      const av = gs.state.avatar || DEFAULT_AVATAR;
+      const key = `${av.style}|${av.seed}`;
+      if (key === gs.playerAvatarKey) return;
+      gs.playerAvatarKey = key;
+      loadImg(
+        avatarUrl({ style: av.style, seed: av.seed, size: 96 }),
+        gs,
+        img => { if (gs.playerAvatarKey === key) gs.playerAvatarImg = img; },
+      );
+    };
+    refreshPlayerAvatar();
+    // Expose so the render loop can re-check after the picker modal saves.
+    (gs as GameState & { refreshPlayerAvatar?: () => void }).refreshPlayerAvatar = refreshPlayerAvatar;
 
     // Swap to a new zone, repositioning the player to the matching opposite edge
     // and rebuilding ambient mons / trainers / items for that map.
@@ -219,7 +251,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       gs.py = entry.y + 0.5;
       gs.pvx = 0; gs.pvy = 0;
       gs.ambientMons = makeAmbientMons(newId, newMap);
-      gs.trainers = newMap.features.trainers.map(t => ({ ...t, img: null, bobTimer: Math.random() * Math.PI * 2 }));
+      gs.trainers = newMap.features.trainers.map(t => ({ ...t, img: null, avatarImg: null, bobTimer: Math.random() * Math.PI * 2 }));
       gs.items = newMap.features.items.map(it => ({ tx: it.x, ty: it.y, type: it.type, bobTimer: Math.random() * Math.PI * 2 }));
       gs.encounterCooldown = 1.0;
       gs.lastTileKey = '';
@@ -870,7 +902,10 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
 
   const psx = gs.px * TS - camX;
   const psy = gs.py * TS - camY + gs.pz * 2;
-  sprites.push({ y: gs.py, draw: () => drawPlayer(ctx, psx, psy, gs.facing, gs.walkFrame) });
+  // Re-check player avatar each frame so the picker modal updates live.
+  (gs as GameState & { refreshPlayerAvatar?: () => void }).refreshPlayerAvatar?.();
+  const playerAvatar = gs.playerAvatarImg;
+  sprites.push({ y: gs.py, draw: () => drawPlayer(ctx, psx, psy, gs.facing, gs.walkFrame, playerAvatar) });
 
   // Follower: the primary team Pokémon trails Addie by ~14 frames.
   if (gs.followerImg && gs.posHistory.length > 14) {
@@ -1456,10 +1491,27 @@ function drawPixelArt(
   }
 }
 
-function drawPlayer(ctx: CanvasRenderingContext2D, sx: number, sy: number, facing: string, walkFrame: number) {
+function drawPlayer(ctx: CanvasRenderingContext2D, sx: number, sy: number, facing: string, walkFrame: number, avatarImg: HTMLImageElement | null) {
   // Shadow under feet
   ctx.fillStyle = 'rgba(0,0,0,0.32)';
   ctx.beginPath(); ctx.ellipse(sx, sy + 3, 14, 4, 0, 0, Math.PI * 2); ctx.fill();
+
+  if (avatarImg) {
+    // DiceBear avatars are square and front-facing; flip horizontally
+    // for left so Addie still "faces" the way she's walking.
+    const w = 36, h = 40;
+    const bob = walkFrame === 0 ? 0 : -1;
+    if (facing === 'left') {
+      ctx.save();
+      ctx.translate(sx, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(avatarImg, -w / 2, sy - h + 2 + bob, w, h);
+      ctx.restore();
+    } else {
+      ctx.drawImage(avatarImg, sx - w / 2, sy - h + 2 + bob, w, h);
+    }
+    return;
+  }
 
   let art: string[];
   if (facing === 'up') art = walkFrame === 0 ? PLAYER_UP_A : PLAYER_UP_B;
@@ -1598,9 +1650,12 @@ function drawTrainerNPC(ctx: CanvasRenderingContext2D, t: TrainerNPC, sx: number
   ctx.fillStyle = 'rgba(0,0,0,0.32)';
   ctx.beginPath(); ctx.ellipse(sx, sy + 16, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Prefer the rasterized chibi portrait (matches the battle VS intro).
-  // The portrait is loaded asynchronously; fall back to the pixel sprite
-  // for the first few frames if it isn't ready yet.
+  // Prefer the DiceBear avatar (seeded uniquely per trainer id), then
+  // the rasterized chibi portrait, then the pixel art fallback.
+  if (t.avatarImg) {
+    const aw = 40, ah = 44;
+    ctx.drawImage(t.avatarImg, sx - aw / 2, sy - ah + 10, aw, ah);
+  } else {
   const portrait = getTrainerPortrait(t.kind);
   if (portrait) {
     // Portrait viewBox is 100×140; draw at ~36×50 so it sits naturally on
@@ -1613,6 +1668,7 @@ function drawTrainerNPC(ctx: CanvasRenderingContext2D, t: TrainerNPC, sx: number
     const scale = 2;
     const w = 14 * scale, h = 20 * scale;
     drawPixelArt(ctx, art, palette, sx - w / 2, sy - h / 2 - 4, scale);
+  }
   }
 
   if (defeated) {
