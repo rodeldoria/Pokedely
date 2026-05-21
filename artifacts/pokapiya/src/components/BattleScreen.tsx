@@ -470,15 +470,30 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         <div style={{
           position: 'absolute', right: '8%', top: '10%',
           width: 200, height: 200,
-          animation: wildAnim,
           transformOrigin: 'center bottom',
-          filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
         }}>
+          {/* Anchored ground shadow — pulses gently in sync with the breath
+              so the silhouette feels planted instead of hovering. */}
+          {monVisible && !caught && !wildFainted && (
+            <div style={{
+              position: 'absolute', left: '50%', bottom: 6,
+              width: '62%', height: 16,
+              transform: 'translateX(-50%)',
+              background: 'radial-gradient(ellipse, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 70%)',
+              animation: idleish ? 'shadowPulse 2.6s ease-in-out infinite' : 'none',
+              pointerEvents: 'none',
+            }} />
+          )}
+          <div style={{
+            width: '100%', height: '100%',
+            animation: wildAnim,
+            transformOrigin: 'center bottom',
+            filter: wildHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
+          }}>
           <img src={homeSpriteUrl(wild.id)} alt={displayName(wild)} style={{
             width: '100%', height: '100%',
             opacity: monVisible ? (caught ? 0 : 1) : 0,
             transition: 'opacity 0.3s',
-            filter: 'drop-shadow(0 6px 0 rgba(0,0,0,0.18))',
           }} onError={(e) => {
             const img = e.currentTarget as HTMLImageElement;
             img.onerror = null;
@@ -491,22 +506,39 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
               fontSize: '88px', animation: 'popIn 0.4s ease-out',
             }}>🔴</div>
           )}
+          </div>
         </div>
 
         {/* Player Pokémon (bottom-left) */}
         <div style={{
           position: 'absolute', left: '14%', bottom: '4%',
           width: 220, height: 220,
-          animation: myAnim,
           transformOrigin: 'center bottom',
-          filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
         }}>
+          {/* Anchored ground shadow — pulses in sync with the breath, offset
+              by 0.4 s to match the player's idle so it doesn't lockstep with the wild. */}
+          {myMember && !myFainted && (
+            <div style={{
+              position: 'absolute', left: '50%', bottom: 4,
+              width: '66%', height: 18,
+              transform: 'translateX(-50%)',
+              background: 'radial-gradient(ellipse, rgba(0,0,0,0.36) 0%, rgba(0,0,0,0) 70%)',
+              animation: idleish ? 'shadowPulse 2.6s ease-in-out 0.4s infinite' : 'none',
+              pointerEvents: 'none',
+            }} />
+          )}
+          <div style={{
+            width: '100%', height: '100%',
+            animation: myAnim,
+            transformOrigin: 'center bottom',
+            filter: myHurt ? 'brightness(1.6) hue-rotate(330deg)' : 'none',
+          }}>
           {myMember && (
             <img src={backSpriteUrl(myMember.id)} alt={myMember.name} style={{
               width: '100%', height: '100%', imageRendering: 'pixelated',
-              filter: 'drop-shadow(0 6px 0 rgba(0,0,0,0.22))',
             }} onError={(e) => { (e.currentTarget as HTMLImageElement).src = spriteUrl(myMember.id); }}/>
           )}
+          </div>
         </div>
 
         {/* Wild HP card (top-left) */}
@@ -718,6 +750,10 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
         @keyframes idleBob {
           0%,100% { transform: scale(1, 1); }
           50%     { transform: scale(1.012, 0.985); }
+        }
+        @keyframes shadowPulse {
+          0%,100% { transform: translateX(-50%) scale(1, 1);    opacity: 1; }
+          50%     { transform: translateX(-50%) scale(1.08, 1); opacity: 0.82; }
         }
         @keyframes lungePlayer {
           0%   { transform: translate(0,0) scale(1); }
