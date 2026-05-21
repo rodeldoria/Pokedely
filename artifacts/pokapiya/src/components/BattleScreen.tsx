@@ -85,36 +85,61 @@ function getMoves(types: string[]): Move[] {
   return [TACKLE, m1, m2, QUICK];
 }
 
-// Simple effectiveness (kid-friendly subset)
-const STRONG_VS: Record<string, string[]> = {
-  fire: ['grass','bug','ice','steel'],
-  water: ['fire','rock','ground'],
-  grass: ['water','rock','ground'],
-  electric: ['water','flying'],
-  ice: ['grass','ground','flying','dragon'],
-  fighting: ['normal','rock','ice','dark','steel'],
-  rock: ['fire','flying','bug','ice'],
-  psychic: ['fighting','poison'],
-  bug: ['grass','psychic','dark'],
-  ghost: ['psychic','ghost'],
-  dragon: ['dragon'],
-  dark: ['psychic','ghost'],
-  steel: ['rock','ice','fairy'],
-  fairy: ['fighting','dragon','dark'],
-  ground: ['fire','electric','rock','steel'],
-  flying: ['grass','fighting','bug'],
-  poison: ['grass','fairy'],
+// Full kid-friendly type chart. For each attacking type we list which
+// defender types it's strong against (2×), weak against (0.5×), or has
+// no effect on (0×). Dual-type defenders multiply per type, so 2×·2× = 4×
+// super effective, 0.5×·0.5× = 0.25× really weak, and any 0× wins.
+interface TypeMatchups { strong: string[]; weak: string[]; immune: string[]; }
+const TYPE_CHART: Record<string, TypeMatchups> = {
+  normal:   { strong: [],                                 weak: ['rock','steel'],                                        immune: ['ghost'] },
+  fire:     { strong: ['grass','bug','ice','steel'],      weak: ['fire','water','rock','dragon'],                        immune: [] },
+  water:    { strong: ['fire','rock','ground'],           weak: ['water','grass','dragon'],                              immune: [] },
+  grass:    { strong: ['water','rock','ground'],          weak: ['fire','grass','poison','flying','bug','dragon','steel'], immune: [] },
+  electric: { strong: ['water','flying'],                 weak: ['electric','grass','dragon'],                           immune: ['ground'] },
+  ice:      { strong: ['grass','ground','flying','dragon'], weak: ['fire','water','ice','steel'],                        immune: [] },
+  fighting: { strong: ['normal','rock','ice','dark','steel'], weak: ['flying','poison','bug','psychic','fairy'],          immune: ['ghost'] },
+  poison:   { strong: ['grass','fairy'],                  weak: ['poison','ground','rock','ghost'],                      immune: ['steel'] },
+  ground:   { strong: ['fire','electric','rock','steel','poison'], weak: ['grass','bug'],                                immune: ['flying'] },
+  flying:   { strong: ['grass','fighting','bug'],         weak: ['electric','rock','steel'],                             immune: [] },
+  psychic:  { strong: ['fighting','poison'],              weak: ['psychic','steel'],                                     immune: ['dark'] },
+  bug:      { strong: ['grass','psychic','dark'],         weak: ['fire','fighting','poison','flying','ghost','steel','fairy'], immune: [] },
+  rock:     { strong: ['fire','flying','bug','ice'],      weak: ['fighting','ground','steel'],                           immune: [] },
+  ghost:    { strong: ['psychic','ghost'],                weak: ['dark'],                                                immune: ['normal'] },
+  dragon:   { strong: ['dragon'],                         weak: ['steel'],                                               immune: ['fairy'] },
+  dark:     { strong: ['psychic','ghost'],                weak: ['fighting','dark','fairy'],                             immune: [] },
+  steel:    { strong: ['rock','ice','fairy'],             weak: ['fire','water','electric','steel'],                     immune: [] },
+  fairy:    { strong: ['fighting','dragon','dark'],       weak: ['fire','poison','steel'],                               immune: [] },
 };
 
 function effectiveness(atk: string, defs: string[]): number {
-  const strong = STRONG_VS[atk] || [];
-  return defs.some(d => strong.includes(d)) ? 1.5 : 1;
+  const m = TYPE_CHART[atk];
+  if (!m) return 1;
+  let mult = 1;
+  for (const d of defs) {
+    if (m.immune.includes(d)) return 0;
+    if (m.strong.includes(d)) mult *= 2;
+    else if (m.weak.includes(d)) mult *= 0.5;
+  }
+  return mult;
+}
+
+// Kid-friendly description for an effectiveness multiplier.
+function effLabel(mult: number): { text: string; color: string } | null {
+  if (mult === 0) return { text: "It had no effect…", color: '#9aa0a8' };
+  if (mult >= 4)  return { text: "Whoa! 4× super effective! 💥", color: '#ffd54a' };
+  if (mult >= 2)  return { text: "It's super effective! ⚡",     color: '#7dd87d' };
+  if (mult <= 0.25) return { text: "It's barely scratching… (¼×)", color: '#bfc3cc' };
+  if (mult <= 0.5)  return { text: "It's not very effective…",    color: '#bfc3cc' };
+  return null;
 }
 
 function calcDamage(move: Move, defenderTypes: string[], level: number): number {
   const base = move.power + Math.floor(level * 0.6);
   const variance = Math.floor(Math.random() * 6) - 2; // -2..+3
   const eff = effectiveness(move.type, defenderTypes);
+  // Floor of 1 only when the attack actually connects — zero effect means
+  // zero damage so kids learn that immunity is real.
+  if (eff === 0) return 0;
   return Math.max(2, Math.round((base + variance) * eff));
 }
 
