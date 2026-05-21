@@ -38,11 +38,15 @@ export interface TrainerState {
   box: PartyMember[];
   pokedex: Record<number, { seen: boolean; caught: boolean; count: number }>;
   stats: { correct: number; wrong: number; caught: number; encounters: number };
-  inventory: { pokeball: number; berry: number; cut: number; rod: number; coin: number; lumber: number; stone: number; seed: number };
+  inventory: { pokeball: number; berry: number; cut: number; rod: number; coin: number; lumber: number; stone: number; seed: number; water: number; metal: number };
   // Tile-scoped maps. Keys are namespaced as `${zoneId}:${x},${y}` so the
   // same coordinates in different zones don't collide.
   worldItems: Record<string, boolean>;
-  cutTrees: Record<string, boolean>;
+  // cutTrees / minedRocks store the epoch ms when the resource was harvested.
+  // A tile is considered "depleted" while (Date.now() - timestamp) < RESOURCE_RESPAWN_MS,
+  // after which it regrows. 0 / missing entries mean "untouched".
+  cutTrees: Record<string, number>;
+  minedRocks: Record<string, number>;
   defeatedTrainers: Record<string, boolean>;
   visitedCenter: number;
   starterChosen: boolean;
@@ -52,15 +56,21 @@ export interface TrainerState {
 const KEY = 'pokapiya.save.v4';
 const LEGACY_KEY_V3 = 'pokapiya.save.v3';
 
+// How long a chopped tree or mined rock stays gone before it regrows.
+// Three minutes is short enough that Addie sees resources come back during
+// a play session, but long enough that the world doesn't feel infinitely farmable.
+export const RESOURCE_RESPAWN_MS = 3 * 60 * 1000;
+
 const empty = (): TrainerState => ({
   trainer: { name: 'Addie', steps: 0 },
   team: [],
   box: [],
   pokedex: {},
   stats: { correct: 0, wrong: 0, caught: 0, encounters: 0 },
-  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0, lumber: 0, stone: 0, seed: 0 },
+  inventory: { pokeball: 5, berry: 0, cut: 0, rod: 0, coin: 0, lumber: 0, stone: 0, seed: 0, water: 0, metal: 0 },
   worldItems: {},
   cutTrees: {},
+  minedRocks: {},
   defeatedTrainers: {},
   visitedCenter: 0,
   starterChosen: false,
@@ -76,6 +86,34 @@ function migrateTileKeys(rec: Record<string, boolean> | undefined): Record<strin
     else out[`town:${k}`] = v;
   }
   return out;
+}
+
+// Migration for timestamp-valued tile maps (cutTrees, minedRocks). Older
+// saves stored plain `true`; treat those as freshly harvested at load time
+// so they regrow on the same schedule new entries would.
+function migrateTimestampKeys(rec: Record<string, boolean | number> | undefined): Record<string, number> {
+  if (!rec) return {};
+  const out: Record<string, number> = {};
+  const now = Date.now();
+  for (const [k, v] of Object.entries(rec)) {
+    const ts = typeof v === 'number' ? v : (v ? now : 0);
+    if (!ts) continue;
+    if (k.includes(':')) out[k] = ts;
+    else out[`town:${k}`] = ts;
+  }
+  return out;
+}
+
+// Resource availability helpers. A tile is "available" (standing tree / intact
+// rock) when its timestamp is missing or older than the respawn window.
+export function isTreeStanding(state: TrainerState, key: string, now: number = Date.now()): boolean {
+  const ts = state.cutTrees[key] || 0;
+  return ts === 0 || (now - ts) >= RESOURCE_RESPAWN_MS;
+}
+
+export function isRockIntact(state: TrainerState, key: string, now: number = Date.now()): boolean {
+  const ts = state.minedRocks[key] || 0;
+  return ts === 0 || (now - ts) >= RESOURCE_RESPAWN_MS;
 }
 
 // Eeveelution → Eevee revert. One-time migration: Addie's Eevee evolved on
@@ -117,7 +155,8 @@ export function load(): TrainerState {
       stats: { ...base.stats, ...(parsed.stats || {}) },
       inventory: { ...base.inventory, ...(parsed.inventory || {}) },
       worldItems: migrateTileKeys(parsed.worldItems),
-      cutTrees: migrateTileKeys(parsed.cutTrees),
+      cutTrees: migrateTimestampKeys(parsed.cutTrees),
+      minedRocks: migrateTimestampKeys(parsed.minedRocks),
       defeatedTrainers: parsed.defeatedTrainers || {},
       currentZone: ZONE_IDS.includes(parsed.currentZone) ? (parsed.currentZone as ZoneId) : 'town',
     };
@@ -232,9 +271,36 @@ export function healAtCenter(state: TrainerState) {
   save(state);
 }
 
-export function cutTree(state: TrainerState, zoneId: ZoneId, x: number, y: number) {
-  state.cutTrees[`${zoneId}:${x},${y}`] = true;
+// Chop a tree. Returns the amount of lumber gained so the caller can toast it.
+// Trees drop 1–2 lumber and have a small chance of yielding a seed as well.
+export function cutTree(state: TrainerState, zoneId: ZoneId, x: number, y: number): { lumber: number; seed: number } {
+  state.cutTrees[`${zoneId}:${x},${y}`] = Date.now();
+  const lumber = 1 + (Math.random() < 0.5 ? 1 : 0);
+  const seed = Math.random() < 0.25 ? 1 : 0;
+  state.inventory.lumber += lumber;
+  state.inventory.seed += seed;
   save(state);
+  return { lumber, seed };
+}
+
+// Mine a rock. Drops 1–2 stone, with a 15% chance to also yield 1 metal.
+export function mineRock(state: TrainerState, zoneId: ZoneId, x: number, y: number): { stone: number; metal: number } {
+  state.minedRocks[`${zoneId}:${x},${y}`] = Date.now();
+  const stone = 1 + (Math.random() < 0.5 ? 1 : 0);
+  const metal = Math.random() < 0.15 ? 1 : 0;
+  state.inventory.stone += stone;
+  state.inventory.metal += metal;
+  save(state);
+  return { stone, metal };
+}
+
+// Scoop water from an adjacent water tile. Water tiles never deplete —
+// it's a renewable resource, like in real life.
+export function scoopWater(state: TrainerState): number {
+  const gain = 1;
+  state.inventory.water += gain;
+  save(state);
+  return gain;
 }
 
 export function setZone(state: TrainerState, zoneId: ZoneId) {

@@ -113,6 +113,8 @@ export default function CraftModal({ state, onChange, onClose }: Props) {
           <ResourceChip label="🪙 Coins" value={inv.coin || 0} />
           <ResourceChip label="🪵 Lumber" value={inv.lumber || 0} />
           <ResourceChip label="🪨 Stone" value={inv.stone || 0} />
+          <ResourceChip label="⚙️ Metal" value={inv.metal || 0} />
+          <ResourceChip label="💧 Water" value={inv.water || 0} />
           <ResourceChip label="🌱 Seed" value={inv.seed || 0} />
           <ResourceChip label="🍓 Berry" value={inv.berry || 0} />
           <ResourceChip label="🔴 Ball" value={inv.pokeball || 0} />

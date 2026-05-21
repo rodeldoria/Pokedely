@@ -467,17 +467,35 @@ export function adjacentToWater(map: TileCode[][], px: number, py: number): { x:
   return null;
 }
 
-// Check if the player is adjacent to a tree (for cut). cutTrees keys are
-// zone-namespaced (`${zoneId}:${x},${y}`) so callers must pass the active zone.
+// Check if the player is adjacent to a standing tree (for cut). cutTrees keys
+// are zone-namespaced (`${zoneId}:${x},${y}`) and hold the epoch ms when the
+// tree was chopped; the tree is "standing again" once enough time has passed
+// (handled by isTreeStanding in save.ts — passed here as an isStanding helper
+// so this module stays save-agnostic).
 export function adjacentToTree(
   map: TileCode[][], px: number, py: number,
-  cutTrees: Record<string, boolean>, zoneId: ZoneId = 'town',
+  isStanding: (key: string) => boolean, zoneId: ZoneId = 'town',
 ): { x: number; y: number } | null {
   const checks = [[0,-1],[0,1],[-1,0],[1,0]];
   const x = Math.floor(px), y = Math.floor(py);
   for (const [dx, dy] of checks) {
     const nx = x + dx, ny = y + dy;
-    if (map[ny]?.[nx] === TILE.TREE && !cutTrees[`${zoneId}:${nx},${ny}`]) return { x: nx, y: ny };
+    if (map[ny]?.[nx] === TILE.TREE && isStanding(`${zoneId}:${nx},${ny}`)) return { x: nx, y: ny };
+  }
+  return null;
+}
+
+// Check if the player is adjacent to an intact rock (for mining). Mirrors
+// adjacentToTree — see comment above for the isIntact pattern.
+export function adjacentToRock(
+  map: TileCode[][], px: number, py: number,
+  isIntact: (key: string) => boolean, zoneId: ZoneId = 'town',
+): { x: number; y: number } | null {
+  const checks = [[0,-1],[0,1],[-1,0],[1,0],[1,1],[-1,1],[1,-1],[-1,-1]];
+  const x = Math.floor(px), y = Math.floor(py);
+  for (const [dx, dy] of checks) {
+    const nx = x + dx, ny = y + dy;
+    if (map[ny]?.[nx] === TILE.ROCK && isIntact(`${zoneId}:${nx},${ny}`)) return { x: nx, y: ny };
   }
   return null;
 }

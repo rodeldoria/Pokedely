@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
+import { TILE, generateZone, isSolid, isTallGrass, isTree, adjacentToWater, adjacentToTree, adjacentToRock, oppositeSide, ZONES, type TileCode, type WorldMap, type NPCTrainer, type ZoneId, type Side } from '../game/world';
 import { spriteUrl, pickRandom, byId, pickByType, pickForZone, maxDexForLevel, displayName, type Pokemon } from '../data/pokedex';
-import { save, recordEncounter, takeItem, cutTree, setZone, getLevel, type TrainerState } from '../game/save';
+import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeStanding, isRockIntact, setZone, getLevel, type TrainerState } from '../game/save';
 
 const TS = 32;
 const CANVAS_W = 960;
@@ -349,10 +349,21 @@ function update(
     if (gs.walkTimer > 0.18) { gs.walkTimer = 0; gs.walkFrame = (gs.walkFrame + 1) % 2; }
   } else { gs.walkFrame = 0; }
 
-  // Collision — also treat cut trees as passable
+  // Collision — also treat freshly-cut trees as passable. Once a tree has
+  // respawned (isTreeStanding === true again) it blocks the player normally,
+  // unless the player happens to be standing on that exact tile, in which case
+  // we keep it passable so she can step out without getting trapped inside.
   const collTile = (x: number, y: number) => {
-    const t = map[Math.floor(y)]?.[Math.floor(x)] as TileCode;
-    if (isTree(t) && gs.state.cutTrees[`${gs.zoneId}:${Math.floor(x)},${Math.floor(y)}`]) return false;
+    const tx = Math.floor(x), ty = Math.floor(y);
+    const t = map[ty]?.[tx] as TileCode;
+    if (isTree(t)) {
+      const key = `${gs.zoneId}:${tx},${ty}`;
+      const standing = isTreeStanding(gs.state, key);
+      if (!standing) return false;
+      // Player is currently inside a tree tile (e.g. it just respawned under
+      // her feet) — let her walk off.
+      if (Math.floor(gs.px) === tx && Math.floor(gs.py) === ty) return false;
+    }
     return isSolid(t);
   };
   if (collTile(npx, gs.py)) npx = gs.px;
@@ -461,23 +472,41 @@ function update(
 
   gs.encounterCooldown = Math.max(0, gs.encounterCooldown - dt);
 
-  // ── F-key actions: fish / cut ─────────────────────────────────────────
+  // ── F-key actions: fish / cut / mine / scoop ──────────────────────────
   if (gs.fJustPressed) {
     gs.fJustPressed = false;
-    const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees, gs.zoneId);
+    const treeIsStanding = (key: string) => isTreeStanding(gs.state, key);
+    const rockIsIntact = (key: string) => isRockIntact(gs.state, key);
+    const tree = adjacentToTree(map, gs.px, gs.py, treeIsStanding, gs.zoneId);
+    const rock = adjacentToRock(map, gs.px, gs.py, rockIsIntact, gs.zoneId);
     const water = adjacentToWater(map, gs.px, gs.py);
     if (tree && gs.state.inventory.cut > 0) {
-      cutTree(gs.state, gs.zoneId, tree.x, tree.y);
+      const { lumber, seed } = cutTree(gs.state, gs.zoneId, tree.x, tree.y);
       stateRef.current = gs.state;
-      gs.toast = { text: "✂️ Cut! The tree fell down!", timer: 1.8 };
-      onToast("✂️ Cut! The tree fell down!");
+      const msg = seed > 0
+        ? `✂️ Timber! +${lumber} 🪵 Lumber, +1 🌱 Seed`
+        : `✂️ Timber! +${lumber} 🪵 Lumber`;
+      gs.toast = { text: msg, timer: 2 };
+      onToast(msg);
     } else if (tree) {
       gs.toast = { text: "You need the Cut HM!", timer: 1.5 };
+    } else if (rock) {
+      const { stone, metal } = mineRock(gs.state, gs.zoneId, rock.x, rock.y);
+      stateRef.current = gs.state;
+      const msg = metal > 0
+        ? `⛏️ Cracked it! +${stone} 🪨 Stone, +1 ⚙️ Metal`
+        : `⛏️ Mined! +${stone} 🪨 Stone`;
+      gs.toast = { text: msg, timer: 2 };
+      onToast(msg);
     } else if (water && gs.state.inventory.rod > 0) {
       gs.fishing = { active: true, timer: 1.4 + Math.random() * 1.2 };
       gs.toast = { text: "🎣 Cast your line… wait for a nibble!", timer: 2.5 };
     } else if (water) {
-      gs.toast = { text: "You need a Fishing Rod!", timer: 1.5 };
+      const gain = scoopWater(gs.state);
+      stateRef.current = gs.state;
+      const msg = `💧 Scooped! +${gain} Water`;
+      gs.toast = { text: msg, timer: 1.8 };
+      onToast(msg);
     }
   }
 
@@ -577,12 +606,21 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     for (let tx = startTX; tx < endTX; tx++) {
       const code = map[ty]?.[tx];
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      // Skip cut trees (they become grass)
-      if (code === TILE.TREE && gs.state.cutTrees[`${gs.zoneId}:${tx},${ty}`]) {
+      // Trees: show stump until they regrow. Rocks: hide them while mined,
+      // then they pop back as the timestamp ages past RESOURCE_RESPAWN_MS.
+      if (code === TILE.TREE && !isTreeStanding(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
         drawTile(ctx, TILE.GRASS, sx, sy, tx, ty);
-        // Show stump
         ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 12, sy + 18, 8, 6);
         ctx.fillStyle = '#5a3e1e'; ctx.fillRect(sx + 14, sy + 19, 4, 4);
+      } else if (code === TILE.ROCK && !isRockIntact(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
+        // Show the underlying floor (grass overworld, path in caves) with a
+        // little gravel scatter where the rock used to be.
+        const base = gs.zoneId === 'cave' ? TILE.PATH : TILE.GRASS;
+        drawTile(ctx, base, sx, sy, tx, ty);
+        ctx.fillStyle = 'rgba(80,70,60,0.55)';
+        ctx.fillRect(sx + 10, sy + 22, 3, 3);
+        ctx.fillRect(sx + 18, sy + 24, 2, 2);
+        ctx.fillRect(sx + 14, sy + 20, 2, 2);
       } else {
         drawTile(ctx, code as TileCode, sx, sy, tx, ty);
       }
@@ -664,15 +702,22 @@ function draw(canvas: HTMLCanvasElement, gs: GameState) {
     ctx.fillText('ENTER', dsx + TS / 2, dsy - 2);
   }
 
-  // F-prompt: cut tree / fish indicator
-  const tree = adjacentToTree(map, gs.px, gs.py, gs.state.cutTrees, gs.zoneId);
+  // F-prompt: tree / rock / water indicator. Trees take priority (matches
+  // the F-press handler order above), then rocks, then water.
+  const treeIsStanding = (key: string) => isTreeStanding(gs.state, key);
+  const rockIsIntact = (key: string) => isRockIntact(gs.state, key);
+  const tree = adjacentToTree(map, gs.px, gs.py, treeIsStanding, gs.zoneId);
+  const rock = !tree ? adjacentToRock(map, gs.px, gs.py, rockIsIntact, gs.zoneId) : null;
   const water = adjacentToWater(map, gs.px, gs.py);
   if (tree && !gs.fishing) {
     const fx = tree.x * TS - camX + TS / 2, fy = tree.y * TS - camY - 12;
-    drawFPrompt(ctx, fx, fy, gs.state.inventory.cut > 0 ? "F: Cut ✂️" : "F: Need Cut HM");
+    drawFPrompt(ctx, fx, fy, gs.state.inventory.cut > 0 ? "F: Chop 🪵" : "F: Need Cut HM");
+  } else if (rock && !gs.fishing) {
+    const fx = rock.x * TS - camX + TS / 2, fy = rock.y * TS - camY - 12;
+    drawFPrompt(ctx, fx, fy, "F: Mine ⛏️");
   } else if (water && !gs.fishing) {
     const fx = water.x * TS - camX + TS / 2, fy = water.y * TS - camY - 12;
-    drawFPrompt(ctx, fx, fy, gs.state.inventory.rod > 0 ? "F: Fish 🎣" : "F: Need Rod");
+    drawFPrompt(ctx, fx, fy, gs.state.inventory.rod > 0 ? "F: Fish 🎣" : "F: Scoop 💧");
   }
 }
 
