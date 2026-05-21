@@ -1,9 +1,26 @@
 import { useState } from 'react';
 import {
   avatarUrl, AVATAR_STYLES, AVATAR_STYLE_LABEL, ROLL_SEEDS, rollSeed,
+  fallbackAvatarDataUri,
   type AvatarStyle,
 } from '../data/avatar';
 import { DEFAULT_AVATAR } from '../data/avatar';
+
+const onAvatarError = (seed: string) => (e: React.SyntheticEvent<HTMLImageElement>) => {
+  const img = e.currentTarget;
+  img.onerror = null;
+  img.src = fallbackAvatarDataUri(seed);
+};
+
+function shuffledSeeds(): string[] {
+  const pool = [...ROLL_SEEDS];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  // Sprinkle in a few fresh random seeds so each roll truly feels new.
+  return [...pool.slice(0, 8), rollSeed(), rollSeed(), rollSeed(), rollSeed()];
+}
 
 interface Props {
   current: { style: AvatarStyle; seed: string };
@@ -14,6 +31,13 @@ interface Props {
 export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
   const [style, setStyle] = useState<AvatarStyle>(current.style || DEFAULT_AVATAR.style);
   const [seed, setSeed] = useState<string>(current.seed || DEFAULT_AVATAR.seed);
+  const [quickSeeds, setQuickSeeds] = useState<string[]>(() => ROLL_SEEDS.slice(0, 12));
+
+  const handleRoll = () => {
+    const next = shuffledSeeds();
+    setQuickSeeds(next);
+    setSeed(next[0]);
+  };
 
   return (
     <div style={{
@@ -43,6 +67,7 @@ export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
           <img
             src={avatarUrl({ style, seed, size: 160 })}
             alt="Your avatar"
+            onError={onAvatarError(seed)}
             style={{
               width: 140, height: 140, borderRadius: 18,
               background: '#fff7e0', border: '3px solid #ffd54a',
@@ -57,7 +82,7 @@ export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
               seed: {seed}
             </div>
             <button
-              onClick={() => setSeed(rollSeed())}
+              onClick={handleRoll}
               style={{
                 background: '#b85cff', color: '#fff', border: 'none',
                 borderRadius: 10, padding: '8px 14px', fontWeight: 'bold',
@@ -89,6 +114,7 @@ export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
                 <img
                   src={avatarUrl({ style: s, seed, size: 32 })}
                   alt={s}
+                  onError={onAvatarError(seed)}
                   style={{
                     width: 28, height: 28, borderRadius: 6,
                     background: '#fff7e0',
@@ -111,7 +137,7 @@ export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(74px, 1fr))',
             gap: 8,
           }}>
-            {ROLL_SEEDS.map(s => (
+            {quickSeeds.map(s => (
               <button
                 key={s}
                 onClick={() => setSeed(s)}
@@ -126,6 +152,7 @@ export default function AvatarPickerModal({ current, onSave, onClose }: Props) {
                 <img
                   src={avatarUrl({ style, seed: s, size: 56 })}
                   alt={s}
+                  onError={onAvatarError(s)}
                   style={{
                     width: 56, height: 56, borderRadius: 8, background: '#fff7e0',
                     imageRendering: style === 'pixel-art' ? 'pixelated' : 'auto',

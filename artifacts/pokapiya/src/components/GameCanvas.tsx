@@ -229,6 +229,9 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       const key = `${av.style}|${av.seed}`;
       if (key === gs.playerAvatarKey) return;
       gs.playerAvatarKey = key;
+      // Clear immediately so an offline/error path on the new key falls
+      // back to the pixel-art sprite instead of showing the stale avatar.
+      gs.playerAvatarImg = null;
       loadImg(
         avatarUrl({ style: av.style, seed: av.seed, size: 96 }),
         gs,
