@@ -5,8 +5,14 @@ import { save, recordEncounter, takeItem, cutTree, mineRock, scoopWater, isTreeS
 import { getTrainerPortrait, preloadAllTrainerPortraits } from './TrainerSprite';
 
 const TS = 32;
-const CANVAS_W = 960;
-const CANVAS_H = 640;
+// Internal canvas resolution. Smaller than the on-screen size on purpose:
+// CSS scales the canvas up to fit the window (see `resize()` below), so
+// dropping the internal pixels gives all sprites a "free zoom" without
+// having to retouch every drawX() helper. 640×400 keeps the 16:10 ratio
+// while making Addie and the wild Pokémon ~1.5× bigger on screen than
+// the old 960×640 resolution.
+const CANVAS_W = 640;
+const CANVAS_H = 400;
 const SPEED = 3.5;
 const JUMP_VEL = -9;
 const GRAVITY = 22;
@@ -94,6 +100,13 @@ interface GameState {
   posHistory: { x: number; y: number; facing: GameState['facing'] }[];
   followerImg: HTMLImageElement | null;
   followerId: number | null;
+  // Pre-rendered static tile layer for the current zone. Built once per
+  // zone load and blitted each frame instead of redrawing hundreds of
+  // path/arc operations per tile (flowers, tallgrass, path noise, sand,
+  // walls, base grass). Dynamic tiles — TREE, ROCK, WATER — are still
+  // drawn per-frame on top so they can animate / change with harvest
+  // state. This is the single biggest perf win for big zones.
+  staticLayer: HTMLCanvasElement | null;
 }
 
 export interface GameCanvasController {
@@ -166,7 +179,9 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       posHistory: [],
       followerImg: null,
       followerId: null,
+      staticLayer: null,
     };
+    gs.staticLayer = buildStaticLayer(worldMap);
     gsRef.current = gs;
 
     const loadEntitySprites = () => {
@@ -181,6 +196,7 @@ export default function GameCanvas({ active, onEncounter, onTrainerEncounter, on
       const newMap = generateZone(newId);
       gs.worldMap = newMap;
       gs.zoneId = newId;
+      gs.staticLayer = buildStaticLayer(newMap);
       const entry = newMap.features.entries[fromSide] || newMap.features.spawn;
       gs.px = entry.x + 0.5;
       gs.py = entry.y + 0.5;
@@ -591,41 +607,91 @@ function update(
   }
 }
 
+// Pre-rendered static tile layer for a zone. All tiles that never change
+// (grass, flower, tallgrass, path, sand, wall) are baked into a single
+// offscreen canvas. For dynamic tiles (TREE, ROCK, WATER) we draw GRASS
+// underneath so the live `draw()` pass can paint trees/rocks/water on top
+// without leaving the dirt-purple background showing through.
+function buildStaticLayer(worldMap: WorldMap): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = worldMap.width * TS;
+  c.height = worldMap.height * TS;
+  const cctx = c.getContext('2d')!;
+  cctx.imageSmoothingEnabled = false;
+  for (let ty = 0; ty < worldMap.height; ty++) {
+    for (let tx = 0; tx < worldMap.width; tx++) {
+      const code = worldMap.map[ty]?.[tx];
+      if (code === undefined) continue;
+      const sx = tx * TS, sy = ty * TS;
+      if (code === TILE.TREE || code === TILE.ROCK || code === TILE.WATER) {
+        drawTile(cctx, TILE.GRASS, sx, sy, tx, ty);
+      } else {
+        drawTile(cctx, code as TileCode, sx, sy, tx, ty);
+      }
+    }
+  }
+  return c;
+}
+
 // ─── DRAW ────────────────────────────────────────────────────────────────────
 function draw(canvas: HTMLCanvasElement, gs: GameState) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const { worldMap: { map, width, height, features }, camX, camY } = gs;
 
+  // Pixel-art friendly: no smoothing on drawImage, which both improves
+  // perf and keeps sprites crisp when CSS scales the canvas up.
+  ctx.imageSmoothingEnabled = false;
+
   ctx.fillStyle = ZONES[gs.zoneId].background;
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  // Blit the cached static tile layer in one drawImage instead of doing
+  // hundreds of per-tile path fills every frame.
+  if (gs.staticLayer) {
+    const sx = Math.max(0, Math.floor(camX));
+    const sy = Math.max(0, Math.floor(camY));
+    const sw = Math.min(gs.staticLayer.width - sx, CANVAS_W);
+    const sh = Math.min(gs.staticLayer.height - sy, CANVAS_H);
+    if (sw > 0 && sh > 0) {
+      ctx.drawImage(gs.staticLayer, sx, sy, sw, sh, sx - camX, sy - camY, sw, sh);
+    }
+  }
 
   const startTX = Math.floor(camX / TS);
   const endTX = Math.min(width, startTX + Math.ceil(CANVAS_W / TS) + 2);
   const startTY = Math.floor(camY / TS);
   const endTY = Math.min(height, startTY + Math.ceil(CANVAS_H / TS) + 2);
 
+  // Per-tile loop now only handles the dynamic tiles (trees, rocks, water).
+  // Everything else (grass + decorations) was painted by the static blit
+  // above, including the grass underneath dynamic tiles.
   for (let ty = startTY; ty < endTY; ty++) {
     for (let tx = startTX; tx < endTX; tx++) {
       const code = map[ty]?.[tx];
+      if (code !== TILE.TREE && code !== TILE.ROCK && code !== TILE.WATER) continue;
       const sx = tx * TS - camX, sy = ty * TS - camY;
-      // Trees: show stump until they regrow. Rocks: hide them while mined,
-      // then they pop back as the timestamp ages past RESOURCE_RESPAWN_MS.
-      if (code === TILE.TREE && !isTreeStanding(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
-        drawTile(ctx, TILE.GRASS, sx, sy, tx, ty);
-        ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 12, sy + 18, 8, 6);
-        ctx.fillStyle = '#5a3e1e'; ctx.fillRect(sx + 14, sy + 19, 4, 4);
-      } else if (code === TILE.ROCK && !isRockIntact(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
-        // Show the underlying floor (grass overworld, path in caves) with a
-        // little gravel scatter where the rock used to be.
-        const base = gs.zoneId === 'cave' ? TILE.PATH : TILE.GRASS;
-        drawTile(ctx, base, sx, sy, tx, ty);
-        ctx.fillStyle = 'rgba(80,70,60,0.55)';
-        ctx.fillRect(sx + 10, sy + 22, 3, 3);
-        ctx.fillRect(sx + 18, sy + 24, 2, 2);
-        ctx.fillRect(sx + 14, sy + 20, 2, 2);
+      if (code === TILE.TREE) {
+        if (isTreeStanding(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
+          drawTree(ctx, sx, sy);
+        } else {
+          ctx.fillStyle = '#8b5a2b'; ctx.fillRect(sx + 12, sy + 18, 8, 6);
+          ctx.fillStyle = '#5a3e1e'; ctx.fillRect(sx + 14, sy + 19, 4, 4);
+        }
+      } else if (code === TILE.ROCK) {
+        if (isRockIntact(gs.state, `${gs.zoneId}:${tx},${ty}`)) {
+          drawRock(ctx, sx, sy);
+        } else {
+          // In caves the cached base under a rock is grass, but the visible
+          // floor should be path. Paint a path patch then sprinkle gravel.
+          if (gs.zoneId === 'cave') drawTile(ctx, TILE.PATH, sx, sy, tx, ty);
+          ctx.fillStyle = 'rgba(80,70,60,0.55)';
+          ctx.fillRect(sx + 10, sy + 22, 3, 3);
+          ctx.fillRect(sx + 18, sy + 24, 2, 2);
+          ctx.fillRect(sx + 14, sy + 20, 2, 2);
+        }
       } else {
-        drawTile(ctx, code as TileCode, sx, sy, tx, ty);
+        drawWater(ctx, sx, sy);
       }
     }
   }
