@@ -1,6 +1,6 @@
 import type { TrainerState } from '../game/save';
 import { displayName, liveSpriteUrl, spriteUrl } from '../data/pokedex';
-import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
+import { avatarUrl, DEFAULT_AVATAR, fallbackAvatarDataUri } from '../data/avatar';
 
 interface Props {
   state: TrainerState;
@@ -39,6 +39,11 @@ export default function TeamModal({ state, onClose, onChangeAvatar }: Props) {
           <img
             src={avatarUrl({ style: av.style, seed: av.seed, size: 96 })}
             alt="avatar"
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.onerror = null;
+              img.src = fallbackAvatarDataUri(av.seed);
+            }}
             style={{
               width: 72, height: 72, borderRadius: 14,
               background: '#fff7e0', border: '2px solid #ffd54a',

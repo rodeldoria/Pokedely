@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { getLevel, xpToNextLevel, type TrainerState } from '../game/save';
 import { subscribeCloudStatus, type CloudStatus } from '../game/cloudSave';
 import { liveSpriteUrl, spriteUrl } from '../data/pokedex';
-import { avatarUrl, DEFAULT_AVATAR } from '../data/avatar';
+import { avatarUrl, DEFAULT_AVATAR, fallbackAvatarDataUri } from '../data/avatar';
 
 interface Props {
   state: TrainerState;
@@ -52,6 +52,11 @@ export default function HUD({ state, zoneName, onTeam, onPokedex, onQuests, onMo
             src={avatarUrl({ style: av.style, seed: av.seed, size: 64 })}
             alt="avatar"
             title={`${av.style} · ${av.seed}`}
+            onError={(e) => {
+              const img = e.currentTarget as HTMLImageElement;
+              img.onerror = null;
+              img.src = fallbackAvatarDataUri(av.seed);
+            }}
             style={{
               width: 40, height: 40, borderRadius: 10,
               background: '#fff7e0', border: '2px solid #ffd54a',

@@ -255,6 +255,7 @@ export default function App() {
           trainerName={currentTrainer?.name}
           trainerReward={currentTrainer?.reward}
           trainerKind={currentTrainer?.kind}
+          trainerId={currentTrainer?.id}
         />
       )}
 

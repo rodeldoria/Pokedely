@@ -47,3 +47,11 @@ export function rollSeed(): string {
 }
 
 export const DEFAULT_AVATAR = { style: 'pixel-art' as AvatarStyle, seed: 'Addie' };
+
+// Tiny inline SVG fallback used when DiceBear is blocked/offline so the UI
+// never shows a broken-image icon. Renders a friendly initial in a circle.
+export function fallbackAvatarDataUri(seed: string, bg = '#ffd54a', fg = '#1a0d00'): string {
+  const ch = (seed || '?').trim().charAt(0).toUpperCase() || '?';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="${bg}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" font-family="Segoe UI, sans-serif" font-size="34" font-weight="bold" fill="${fg}">${ch}</text></svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}

@@ -20,6 +20,7 @@ interface Props {
   trainerName?: string;
   trainerReward?: string;
   trainerKind?: NPCTrainer['kind'];
+  trainerId?: string;
 }
 
 const TYPE_COLORS: Record<string, [string, string]> = {
@@ -149,7 +150,7 @@ function calcDamage(move: Move, defenderTypes: string[], level: number): number 
 
 type Phase = 'sendOut' | 'appear' | 'menu' | 'fightMenu' | 'swapMenu' | 'animating' | 'enemyTurn' | 'question' | 'throwing' | 'result';
 
-export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward, trainerKind }: Props) {
+export default function BattleScreen({ wild, state, onStateChange, onExit, trainerName, trainerReward, trainerKind, trainerId }: Props) {
   const level = getLevel(state);
   const myMember: PartyMember | null = state.team[0] || null;
   if (myMember) ensureMemberHp(myMember, level);
@@ -516,6 +517,7 @@ export default function BattleScreen({ wild, state, onStateChange, onExit, train
           state={state}
           trainerName={trainerName}
           trainerKind={trainerKind}
+          trainerId={trainerId}
         />
       )}
       {/* ── Grass arena ──────────────────────────────────── */}
@@ -1264,9 +1266,9 @@ function TrainerAvatarOrSprite({ trainerId, kind }: { trainerId: string; kind: N
   );
 }
 
-function SendOutIntro({ message, addieLevel, wild, state, trainerName, trainerKind }: {
+function SendOutIntro({ message, addieLevel, wild, state, trainerName, trainerKind, trainerId }: {
   message: string; addieLevel: number; wild: Pokemon; state: TrainerState;
-  trainerName?: string; trainerKind?: NPCTrainer['kind'];
+  trainerName?: string; trainerKind?: NPCTrainer['kind']; trainerId?: string;
 }) {
   return (
     <div style={{
@@ -1348,7 +1350,7 @@ function SendOutIntro({ message, addieLevel, wild, state, trainerName, trainerKi
                     borderLeft: '8px solid #fff',
                   }} />
                 </div>
-                <TrainerAvatarOrSprite trainerId={trainerName || trainerKind} kind={trainerKind} />
+                <TrainerAvatarOrSprite trainerId={trainerId || trainerName || trainerKind} kind={trainerKind} />
               </div>
               <div style={{ color: '#ffd54a', fontSize: 14, fontWeight: 'bold', marginTop: 6, letterSpacing: '1px' }}>
                 {trainerName}
